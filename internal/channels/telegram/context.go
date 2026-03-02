@@ -145,6 +145,12 @@ func extractReplyInfo(msg *telego.Message, botUsername string) *ReplyInfo {
 		info.Body = info.Body[:500] + "..."
 	}
 
+	// Hint for bot replies: the full response is already in session history,
+	// so the LLM doesn't need the full text here — just enough to identify it.
+	if info.IsBotReply && info.Body != "" {
+		info.Body += "\n(This is your previous response — full content is in session history above)"
+	}
+
 	return info
 }
 
