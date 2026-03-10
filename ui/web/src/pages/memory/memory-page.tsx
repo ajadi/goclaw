@@ -10,6 +10,7 @@ import { TableSkeleton } from "@/components/shared/loading-skeleton";
 import { Pagination } from "@/components/shared/pagination";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useAgents } from "@/pages/agents/hooks/use-agents";
+import { useContactResolver } from "@/hooks/use-contact-resolver";
 import { useMemoryDocuments } from "./hooks/use-memory";
 import { MemoryDocumentDialog } from "./memory-document-dialog";
 import { MemoryCreateDialog } from "./memory-create-dialog";
@@ -54,6 +55,9 @@ export function MemoryPage() {
     }
     return Array.from(set).sort();
   }, [documents]);
+
+  // Resolve user IDs to display names via contacts API
+  const { resolve: resolveContact } = useContactResolver(userIds);
 
   // Build agent lookup map for displaying agent names in global view
   const agentMap = useMemo(() => {
@@ -151,7 +155,7 @@ export function MemoryPage() {
             <option value="">{t("filters.allScope")}</option>
             {userIds.map((uid) => (
               <option key={uid} value={uid}>
-                {formatScopeLabel(uid)}
+                {formatScopeLabel(uid, resolveContact)}
               </option>
             ))}
           </select>
@@ -220,7 +224,7 @@ export function MemoryPage() {
                         {doc.user_id ? t("scopeLabel.personal") : t("scopeLabel.global")}
                       </Badge>
                       {doc.user_id && (
-                        <span className="ml-1 text-xs text-muted-foreground">{formatScopeLabel(doc.user_id)}</span>
+                        <span className="ml-1 text-xs text-muted-foreground">{formatScopeLabel(doc.user_id, resolveContact)}</span>
                       )}
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
@@ -295,8 +299,15 @@ export function MemoryPage() {
   );
 }
 
-/** Format user_id into a readable scope label (e.g. "group:telegram:-100xxx" -> "Telegram -100xxx") */
-function formatScopeLabel(userId: string): string {
+/** Format user_id into a readable scope label, preferring contact title if available. */
+function formatScopeLabel(userId: string, resolveContact?: (id: string) => { display_name?: string; username?: string } | null): string {
+  // Try contact resolver first
+  if (resolveContact) {
+    const contact = resolveContact(userId);
+    if (contact?.display_name) return contact.display_name;
+    if (contact?.username) return `@${contact.username}`;
+  }
+  // Fallback: format group IDs nicely
   if (userId.startsWith("group:")) {
     const parts = userId.split(":");
     if (parts.length >= 3) {
