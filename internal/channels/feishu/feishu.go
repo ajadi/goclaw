@@ -121,6 +121,11 @@ func (c *Channel) Start(ctx context.Context) error {
 // BlockReplyEnabled returns the per-channel block_reply override (nil = inherit gateway default).
 func (c *Channel) BlockReplyEnabled() *bool { return c.cfg.BlockReply }
 
+// SetPendingCompaction configures LLM-based auto-compaction for pending messages.
+func (c *Channel) SetPendingCompaction(cfg *channels.CompactionConfig) {
+	c.groupHistory.SetCompactionConfig(cfg)
+}
+
 // Stop shuts down the Feishu channel.
 func (c *Channel) Stop(_ context.Context) error {
 	c.groupHistory.StopFlusher()

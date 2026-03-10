@@ -1,5 +1,7 @@
 import { useState, useCallback } from "react";
+import i18next from "i18next";
 import { useHttp } from "@/hooks/use-ws";
+import { toast } from "@/stores/use-toast-store";
 import type { PendingMessageGroup, PendingMessage } from "../types";
 
 export function usePendingMessages() {
@@ -42,12 +44,23 @@ export function usePendingMessages() {
   const compactGroup = useCallback(
     async (channel: string, key: string) => {
       try {
-        await http.post("/v1/pending-messages/compact", {
-          channel_name: channel,
-          history_key: key,
-        });
+        const res = await http.post<{ status: string; method?: string; remaining?: number }>(
+          "/v1/pending-messages/compact",
+          { channel_name: channel, history_key: key },
+        );
+        const method = res?.method ?? "summarized";
+        toast.success(
+          i18next.t("pending-messages:toast.compacted"),
+          method === "deleted"
+            ? i18next.t("pending-messages:toast.compactedDeleted")
+            : i18next.t("pending-messages:toast.compactedSummarized", { count: res?.remaining ?? 0 }),
+        );
         return true;
-      } catch {
+      } catch (err) {
+        toast.error(
+          i18next.t("pending-messages:toast.failedCompact"),
+          err instanceof Error ? err.message : "",
+        );
         return false;
       }
     },
@@ -58,8 +71,13 @@ export function usePendingMessages() {
     async (channel: string, key: string) => {
       try {
         await http.delete(`/v1/pending-messages?channel=${encodeURIComponent(channel)}&key=${encodeURIComponent(key)}`);
+        toast.success(i18next.t("pending-messages:toast.cleared"));
         return true;
-      } catch {
+      } catch (err) {
+        toast.error(
+          i18next.t("pending-messages:toast.failedClear"),
+          err instanceof Error ? err.message : "",
+        );
         return false;
       }
     },

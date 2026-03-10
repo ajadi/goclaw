@@ -6,6 +6,7 @@ import { BehaviorUxCard } from "./behavior-ux-card";
 import { BehaviorRateCard } from "./behavior-rate-card";
 import { BehaviorSessionsCard } from "./behavior-sessions-card";
 import { BehaviorSecurityCard } from "./behavior-security-card";
+import { BehaviorPendingCompactionCard, type PendingCompactionValues } from "./behavior-pending-compaction-card";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -22,6 +23,7 @@ export function BehaviorSection({ config, onPatch, saving }: Props) {
   const ag = config.agents?.defaults ?? {};
   const tl = config.tools ?? {};
   const ss = config.sessions ?? {};
+  const ch = config.channels ?? {};
 
   // UX toggles (from gateway + agents.defaults)
   const [ux, setUx] = useState({
@@ -49,6 +51,11 @@ export function BehaviorSection({ config, onPatch, saving }: Props) {
     scrub_credentials: tl.scrub_credentials,
   });
 
+  // Pending compaction (from channels.pending_compaction)
+  const [pendingCompaction, setPendingCompaction] = useState<PendingCompactionValues>(
+    ch.pending_compaction ?? {},
+  );
+
   const [dirty, setDirty] = useState(false);
 
   // Reset drafts when external config changes
@@ -68,6 +75,7 @@ export function BehaviorSection({ config, onPatch, saving }: Props) {
       injection_action: gw.injection_action,
       scrub_credentials: tl.scrub_credentials,
     });
+    setPendingCompaction(ch.pending_compaction ?? {});
     setDirty(false);
   }, [config]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -91,6 +99,7 @@ export function BehaviorSection({ config, onPatch, saving }: Props) {
       },
       tools: { ...tl, scrub_credentials: security.scrub_credentials },
       sessions: { ...ss, ...sessions },
+      channels: { ...ch, pending_compaction: pendingCompaction },
     });
   };
 
@@ -100,6 +109,7 @@ export function BehaviorSection({ config, onPatch, saving }: Props) {
       <BehaviorRateCard value={rate} onChange={markDirty(setRate)} />
       <BehaviorSessionsCard value={sessions} onChange={markDirty(setSessions)} />
       <BehaviorSecurityCard value={security} onChange={markDirty(setSecurity)} />
+      <BehaviorPendingCompactionCard value={pendingCompaction} onChange={markDirty(setPendingCompaction)} />
 
       {dirty && (
         <div className="flex justify-end pt-2">

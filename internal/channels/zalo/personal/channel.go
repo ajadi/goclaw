@@ -123,6 +123,11 @@ func (c *Channel) Start(ctx context.Context) error {
 	return nil
 }
 
+// SetPendingCompaction configures LLM-based auto-compaction for pending messages.
+func (c *Channel) SetPendingCompaction(cfg *channels.CompactionConfig) {
+	c.groupHistory.SetCompactionConfig(cfg)
+}
+
 // Stop gracefully shuts down the Zalo Personal channel.
 func (c *Channel) Stop(_ context.Context) error {
 	c.groupHistory.StopFlusher()

@@ -616,6 +616,9 @@ func runGateway() {
 		server.SetBuiltinToolsHandler(builtinToolsH)
 	}
 	if pendingMessagesH != nil {
+		if pc := cfg.Channels.PendingCompaction; pc != nil {
+			pendingMessagesH.SetKeepRecent(pc.KeepRecent)
+		}
 		server.SetPendingMessagesHandler(pendingMessagesH)
 	}
 
@@ -678,6 +681,8 @@ func runGateway() {
 	var instanceLoader *channels.InstanceLoader
 	if pgStores.ChannelInstances != nil {
 		instanceLoader = channels.NewInstanceLoader(pgStores.ChannelInstances, pgStores.Agents, channelMgr, msgBus, pgStores.Pairing)
+		instanceLoader.SetProviderRegistry(providerRegistry)
+		instanceLoader.SetPendingCompactionConfig(cfg.Channels.PendingCompaction)
 		instanceLoader.RegisterFactory(channels.TypeTelegram, telegram.FactoryWithStores(pgStores.Agents, pgStores.Teams, pgStores.PendingMessages))
 		instanceLoader.RegisterFactory(channels.TypeDiscord, discord.FactoryWithPendingStore(pgStores.PendingMessages))
 		instanceLoader.RegisterFactory(channels.TypeFeishu, feishu.FactoryWithPendingStore(pgStores.PendingMessages))

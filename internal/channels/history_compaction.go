@@ -123,7 +123,7 @@ func (ph *PendingHistory) runCompaction(historyKey string, cfg *CompactionConfig
 	// Force-flush buffer to ensure DB is consistent
 	ph.flushNow()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 	defer cancel()
 
 	// Check threshold from DB (may have been cleared since trigger)

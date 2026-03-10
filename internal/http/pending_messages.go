@@ -16,13 +16,18 @@ import (
 // PendingMessagesHandler handles pending message HTTP endpoints.
 type PendingMessagesHandler struct {
 	store       store.PendingMessageStore
+	agentStore  store.AgentStore
 	token       string
 	providerReg *providers.Registry
+	keepRecent  int // global keepRecent from config (0 = use default 15)
 }
 
-func NewPendingMessagesHandler(s store.PendingMessageStore, token string, providerReg *providers.Registry) *PendingMessagesHandler {
-	return &PendingMessagesHandler{store: s, token: token, providerReg: providerReg}
+func NewPendingMessagesHandler(s store.PendingMessageStore, agentStore store.AgentStore, token string, providerReg *providers.Registry) *PendingMessagesHandler {
+	return &PendingMessagesHandler{store: s, agentStore: agentStore, token: token, providerReg: providerReg}
 }
+
+// SetKeepRecent sets the global keepRecent value from config.
+func (h *PendingMessagesHandler) SetKeepRecent(n int) { h.keepRecent = n }
 
 func (h *PendingMessagesHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /v1/pending-messages", h.authMiddleware(h.handleListGroups))
@@ -121,8 +126,8 @@ func (h *PendingMessagesHandler) handleCompact(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Resolve an LLM provider for summarization
-	provider := h.resolveProvider()
+	// Resolve an LLM provider for summarization using the default agent's config
+	provider, model := h.resolveProviderAndModel()
 	if provider == nil {
 		// Fallback: hard delete if no provider available
 		slog.Warn("compact.no_provider", "channel", req.ChannelName, "key", req.HistoryKey)
@@ -134,10 +139,14 @@ func (h *PendingMessagesHandler) handleCompact(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 180*time.Second)
 	defer cancel()
 
-	remaining, err := channels.CompactGroup(ctx, h.store, req.ChannelName, req.HistoryKey, provider, provider.DefaultModel(), 15)
+	keepRecent := h.keepRecent
+	if keepRecent <= 0 {
+		keepRecent = 15
+	}
+	remaining, err := channels.CompactGroup(ctx, h.store, req.ChannelName, req.HistoryKey, provider, model, keepRecent)
 	if err != nil {
 		slog.Warn("compact.failed", "channel", req.ChannelName, "key", req.HistoryKey, "error", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
@@ -146,18 +155,38 @@ func (h *PendingMessagesHandler) handleCompact(w http.ResponseWriter, r *http.Re
 	writeJSON(w, http.StatusOK, map[string]interface{}{"status": "ok", "method": "summarized", "remaining": remaining})
 }
 
-// resolveProvider returns the first available LLM provider, or nil.
-func (h *PendingMessagesHandler) resolveProvider() providers.Provider {
+// resolveProviderAndModel resolves the LLM provider+model for pending message compaction.
+// Uses the default agent's configured provider and model so compaction uses the same
+// LLM as the agent that processes these messages.
+func (h *PendingMessagesHandler) resolveProviderAndModel() (providers.Provider, string) {
 	if h.providerReg == nil {
-		return nil
+		return nil, ""
 	}
-	names := h.providerReg.List()
-	if len(names) == 0 {
-		return nil
+
+	// Use the default agent's provider+model
+	if h.agentStore != nil {
+		if ag, err := h.agentStore.GetDefault(context.Background()); err == nil && ag.Provider != "" {
+			if p, err := h.providerReg.Get(ag.Provider); err == nil {
+				model := ag.Model
+				if model == "" {
+					model = p.DefaultModel()
+				}
+				if model != "" {
+					return p, model
+				}
+			}
+		}
 	}
-	p, err := h.providerReg.Get(names[0])
-	if err != nil {
-		return nil
+
+	// Fallback: first provider with a valid default model
+	for _, name := range h.providerReg.List() {
+		p, err := h.providerReg.Get(name)
+		if err != nil {
+			continue
+		}
+		if p.DefaultModel() != "" {
+			return p, p.DefaultModel()
+		}
 	}
-	return p
+	return nil, ""
 }

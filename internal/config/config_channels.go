@@ -1,14 +1,23 @@
 package config
 
+// PendingCompactionConfig configures LLM-based compaction of pending group messages.
+// When a group accumulates more than Threshold pending messages, older messages are
+// summarized by an LLM and replaced with a compact summary, keeping KeepRecent raw messages.
+type PendingCompactionConfig struct {
+	Threshold  int `json:"threshold,omitempty"`   // trigger compaction when entries exceed this (default 50)
+	KeepRecent int `json:"keep_recent,omitempty"` // keep this many recent raw messages after compaction (default 15)
+}
+
 // ChannelsConfig contains per-channel configuration.
 type ChannelsConfig struct {
-	Telegram     TelegramConfig     `json:"telegram"`
-	Discord      DiscordConfig      `json:"discord"`
-	Slack        SlackConfig        `json:"slack"`
-	WhatsApp     WhatsAppConfig     `json:"whatsapp"`
-	Zalo         ZaloConfig         `json:"zalo"`
-	ZaloPersonal ZaloPersonalConfig `json:"zalo_personal"`
-	Feishu       FeishuConfig       `json:"feishu"`
+	Telegram          TelegramConfig           `json:"telegram"`
+	Discord           DiscordConfig            `json:"discord"`
+	Slack             SlackConfig              `json:"slack"`
+	WhatsApp          WhatsAppConfig           `json:"whatsapp"`
+	Zalo              ZaloConfig               `json:"zalo"`
+	ZaloPersonal      ZaloPersonalConfig       `json:"zalo_personal"`
+	Feishu            FeishuConfig             `json:"feishu"`
+	PendingCompaction *PendingCompactionConfig `json:"pending_compaction,omitempty"` // global pending message compaction settings
 }
 
 type TelegramConfig struct {

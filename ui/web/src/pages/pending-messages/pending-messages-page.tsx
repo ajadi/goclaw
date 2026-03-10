@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Inbox, RefreshCw, Trash2, Archive, Loader2 } from "lucide-react";
+import { Inbox, RefreshCw, Trash2, Archive, Loader2, Info, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/shared/page-header";
@@ -71,6 +71,8 @@ export function PendingMessagesPage() {
           </Button>
         }
       />
+
+      <HowItWorksCard />
 
       <div className="mt-4">
         {showSkeleton ? (
@@ -176,6 +178,50 @@ export function PendingMessagesPage() {
           onConfirm={() => handleClear(confirmClear)}
           onCancel={() => setConfirmClear(null)}
         />
+      )}
+    </div>
+  );
+}
+
+function HowItWorksCard() {
+  const { t } = useTranslation("pending-messages");
+  const [open, setOpen] = useState(true);
+
+  return (
+    <div className="mt-4">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center gap-2 rounded-lg border bg-muted/30 px-4 py-2.5 text-left text-sm transition-colors hover:bg-muted/50"
+      >
+        <Info className="h-4 w-4 shrink-0 text-blue-500" />
+        <span className="font-medium">{t("howItWorks.title")}</span>
+        {open ? (
+          <ChevronUp className="ml-auto h-4 w-4 text-muted-foreground" />
+        ) : (
+          <ChevronDown className="ml-auto h-4 w-4 text-muted-foreground" />
+        )}
+      </button>
+      {open && (
+        <div className="rounded-b-lg border border-t-0 bg-muted/10 px-4 py-3 space-y-2.5 text-sm text-muted-foreground">
+          <div className="flex gap-2.5">
+            <span className="shrink-0 mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500/10 text-xs font-semibold text-blue-600">1</span>
+            <p>{t("howItWorks.step1")}</p>
+          </div>
+          <div className="flex gap-2.5">
+            <span className="shrink-0 mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500/10 text-xs font-semibold text-blue-600">2</span>
+            <p>{t("howItWorks.step2")}</p>
+          </div>
+          <div className="flex gap-2.5">
+            <span className="shrink-0 mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500/10 text-xs font-semibold text-blue-600">3</span>
+            <p>{t("howItWorks.step3")}</p>
+          </div>
+          <hr className="border-border/50" />
+          <div className="space-y-1.5 text-xs">
+            <p><Archive className="mr-1 inline h-3 w-3" /><strong>{t("howItWorks.compactAction")}</strong></p>
+            <p><Trash2 className="mr-1 inline h-3 w-3" /><strong>{t("howItWorks.clearAction")}</strong></p>
+          </div>
+        </div>
       )}
     </div>
   );

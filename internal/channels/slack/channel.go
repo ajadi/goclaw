@@ -280,6 +280,11 @@ func (c *Channel) handleEvent(evt socketmode.Event) {
 	}
 }
 
+// SetPendingCompaction configures LLM-based auto-compaction for pending messages.
+func (c *Channel) SetPendingCompaction(cfg *channels.CompactionConfig) {
+	c.groupHistory.SetCompactionConfig(cfg)
+}
+
 // Stop gracefully shuts down the Slack channel.
 func (c *Channel) Stop(_ context.Context) error {
 	c.groupHistory.StopFlusher()

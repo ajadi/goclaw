@@ -308,6 +308,13 @@ func (c *BaseChannel) HandleMessage(senderID, chatID, content string, media []st
 	c.bus.PublishInbound(msg)
 }
 
+// PendingCompactable is optionally implemented by channels that have a PendingHistory
+// supporting LLM-based compaction. InstanceLoader uses this to wire compaction config
+// after channel creation.
+type PendingCompactable interface {
+	SetPendingCompaction(cfg *CompactionConfig)
+}
+
 // Truncate shortens a string to maxLen, appending "..." if truncated.
 func Truncate(s string, maxLen int) string {
 	if len(s) <= maxLen {
