@@ -853,7 +853,7 @@ func runGateway() {
 	registerConfigChannels(cfg, channelMgr, msgBus, pgStores, instanceLoader)
 
 	// Register channels/instances/links/teams RPC methods
-	wireChannelRPCMethods(server, pgStores, channelMgr, agentRouter, msgBus, dataDir)
+	wireChannelRPCMethods(server, pgStores, channelMgr, agentRouter, msgBus, workspace)
 
 	// Wire channel event subscribers (cache invalidation, pairing, cascade disable)
 	wireChannelEventSubscribers(msgBus, server, pgStores, channelMgr, instanceLoader, pairingMethods, cfg)

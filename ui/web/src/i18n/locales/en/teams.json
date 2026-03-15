@@ -64,6 +64,8 @@
     "unassigned": "Unassigned",
     "filters": {
       "active": "Active",
+      "pending": "Pending",
+      "inProgress": "In Progress",
       "inReview": "In Review",
       "completed": "Completed",
       "all": "All"
@@ -224,6 +226,7 @@
       "autoRecoveryDesc": "Stuck tasks auto-reset after timeout",
       "escalationPolicy": "Escalation Policy",
       "escalationPolicyDesc": "Control what agents can do autonomously",
+      "comingSoon": "Coming soon",
       "downgradeNote": "Downgrade is safe — V2 data is preserved but hidden.",
       "betaNote": "V2 is currently in Beta.",
       "gotIt": "Got it"
@@ -264,5 +267,25 @@
     "taskAssigned": "Task assigned",
     "failedCreateTask": "Failed to create task",
     "failedAssignTask": "Failed to assign task"
+  },
+  "board": {
+    "kanban": "Board",
+    "list": "List",
+    "groupBy": "Group by",
+    "groupByStatus": "Status",
+    "groupByOwner": "Owner",
+    "groupByType": "Type",
+    "running": "Running",
+    "locked": "Agent is running",
+    "emptyColumn": "No tasks",
+    "unassigned": "Unassigned",
+    "createViaChat": "Chat with the team agent to create tasks"
+  },
+  "sidebar": {
+    "members": "Members",
+    "workspace": "Workspace",
+    "delegations": "Delegations",
+    "settings": "Settings",
+    "addMember": "Add member"
   }
 }

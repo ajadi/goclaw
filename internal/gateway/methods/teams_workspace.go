@@ -73,11 +73,11 @@ func (m *TeamsMethods) handleWorkspaceList(ctx context.Context, client *gateway.
 	var files []workspaceFileEntry
 
 	if params.ChatID != "" {
-		// Scoped: list files in specific chatID directory.
+		// Scoped: list files and folders in specific chatID directory.
 		scopeDir := teamWorkspaceDir(m.dataDir, teamID, params.ChatID)
-		files = listDirFiles(scopeDir, params.ChatID)
+		files = walkDir(scopeDir, "", params.ChatID)
 	} else {
-		// Unscoped: list all chatID subdirectories and their files.
+		// Unscoped: list all chatID subdirectories and their files/folders.
 		entries, err := os.ReadDir(baseDir)
 		if err != nil {
 			// Directory doesn't exist = empty workspace.
@@ -93,7 +93,7 @@ func (m *TeamsMethods) handleWorkspaceList(ctx context.Context, client *gateway.
 			}
 			chatID := entry.Name()
 			scopeDir := filepath.Join(baseDir, chatID)
-			files = append(files, listDirFiles(scopeDir, chatID)...)
+			files = append(files, walkDir(scopeDir, "", chatID)...)
 		}
 	}
 
@@ -107,15 +107,28 @@ func (m *TeamsMethods) handleWorkspaceList(ctx context.Context, client *gateway.
 	}))
 }
 
-// listDirFiles lists non-directory files in a directory, returning workspaceFileEntry slice.
-func listDirFiles(dir, chatID string) []workspaceFileEntry {
-	entries, err := os.ReadDir(dir)
+// walkDir recursively lists files and directories, returning workspaceFileEntry slice
+// with relative paths. prefix is the relative path prefix for nested entries.
+func walkDir(baseDir, prefix, chatID string) []workspaceFileEntry {
+	entries, err := os.ReadDir(baseDir)
 	if err != nil {
 		return nil
 	}
 	var files []workspaceFileEntry
 	for _, entry := range entries {
+		relPath := entry.Name()
+		if prefix != "" {
+			relPath = prefix + "/" + entry.Name()
+		}
 		if entry.IsDir() {
+			files = append(files, workspaceFileEntry{
+				Name:   relPath,
+				Path:   filepath.Join(baseDir, entry.Name()),
+				ChatID: chatID,
+				IsDir:  true,
+			})
+			// Recurse into subdirectory.
+			files = append(files, walkDir(filepath.Join(baseDir, entry.Name()), relPath, chatID)...)
 			continue
 		}
 		info, err := entry.Info()
@@ -123,8 +136,8 @@ func listDirFiles(dir, chatID string) []workspaceFileEntry {
 			continue
 		}
 		files = append(files, workspaceFileEntry{
-			Name:      entry.Name(),
-			Path:      filepath.Join(dir, entry.Name()),
+			Name:      relPath,
+			Path:      filepath.Join(baseDir, entry.Name()),
 			Size:      info.Size(),
 			ChatID:    chatID,
 			UpdatedAt: info.ModTime().UTC().Format("2006-01-02T15:04:05Z"),
@@ -153,8 +166,8 @@ func (m *TeamsMethods) handleWorkspaceRead(ctx context.Context, client *gateway.
 		client.SendResponse(protocol.NewErrorResponse(req.ID, protocol.ErrInvalidRequest, i18n.T(locale, i18n.MsgRequired, "team_id, file_name")))
 		return
 	}
-	// Security: reject path traversal.
-	if strings.Contains(params.FileName, "..") || strings.ContainsAny(params.FileName, "/\\") {
+	// Security: reject path traversal (allow "/" for nested paths, reject "\" and "..").
+	if strings.Contains(params.FileName, "..") || strings.Contains(params.FileName, "\\") {
 		client.SendResponse(protocol.NewErrorResponse(req.ID, protocol.ErrInvalidRequest, "invalid file_name"))
 		return
 	}
@@ -170,7 +183,13 @@ func (m *TeamsMethods) handleWorkspaceRead(ctx context.Context, client *gateway.
 		chatID = "_default"
 	}
 
-	diskPath := filepath.Join(teamWorkspaceDir(m.dataDir, teamID, chatID), params.FileName)
+	scopeDir := teamWorkspaceDir(m.dataDir, teamID, chatID)
+	diskPath := filepath.Clean(filepath.Join(scopeDir, params.FileName))
+	// Ensure resolved path stays within the workspace scope directory.
+	if !strings.HasPrefix(diskPath, filepath.Clean(scopeDir)+string(os.PathSeparator)) && diskPath != filepath.Clean(scopeDir) {
+		client.SendResponse(protocol.NewErrorResponse(req.ID, protocol.ErrInvalidRequest, "invalid file_name"))
+		return
+	}
 	data, err := os.ReadFile(diskPath)
 	if err != nil {
 		client.SendResponse(protocol.NewErrorResponse(req.ID, protocol.ErrNotFound, fmt.Sprintf("file not found: %s", params.FileName)))
@@ -219,8 +238,8 @@ func (m *TeamsMethods) handleWorkspaceDelete(ctx context.Context, client *gatewa
 		client.SendResponse(protocol.NewErrorResponse(req.ID, protocol.ErrInvalidRequest, i18n.T(locale, i18n.MsgRequired, "team_id, file_name")))
 		return
 	}
-	// Security: reject path traversal.
-	if strings.Contains(params.FileName, "..") || strings.ContainsAny(params.FileName, "/\\") {
+	// Security: reject path traversal (allow "/" for nested paths, reject "\" and "..").
+	if strings.Contains(params.FileName, "..") || strings.Contains(params.FileName, "\\") {
 		client.SendResponse(protocol.NewErrorResponse(req.ID, protocol.ErrInvalidRequest, "invalid file_name"))
 		return
 	}
@@ -236,7 +255,13 @@ func (m *TeamsMethods) handleWorkspaceDelete(ctx context.Context, client *gatewa
 		chatID = "_default"
 	}
 
-	diskPath := filepath.Join(teamWorkspaceDir(m.dataDir, teamID, chatID), params.FileName)
+	scopeDir := teamWorkspaceDir(m.dataDir, teamID, chatID)
+	diskPath := filepath.Clean(filepath.Join(scopeDir, params.FileName))
+	// Ensure resolved path stays within the workspace scope directory.
+	if !strings.HasPrefix(diskPath, filepath.Clean(scopeDir)+string(os.PathSeparator)) && diskPath != filepath.Clean(scopeDir) {
+		client.SendResponse(protocol.NewErrorResponse(req.ID, protocol.ErrInvalidRequest, "invalid file_name"))
+		return
+	}
 	if err := os.Remove(diskPath); err != nil {
 		client.SendResponse(protocol.NewErrorResponse(req.ID, protocol.ErrNotFound, fmt.Sprintf("file not found: %s", params.FileName)))
 		return
