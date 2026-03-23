@@ -8,7 +8,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Check, Minus,
+  Check,
   ListTodo, FolderOpen, Lock, Bell,
   ClipboardCheck, BarChart3, MessageSquare, RotateCcw, ShieldCheck,
 } from "lucide-react";
@@ -26,9 +26,9 @@ const FEATURES = [
   { key: "followupReminders", icon: Bell },
   { key: "progressTracking", icon: BarChart3 },
   { key: "autoRecovery", icon: RotateCcw },
-  { key: "commentsAudit", icon: MessageSquare, comingSoon: true },
-  { key: "escalationPolicy", icon: ShieldCheck, comingSoon: true },
-  { key: "reviewWorkflow", icon: ClipboardCheck, comingSoon: true },
+  { key: "commentsAudit", icon: MessageSquare },
+  { key: "escalationPolicy", icon: ShieldCheck },
+  { key: "reviewWorkflow", icon: ClipboardCheck },
 ] as const;
 
 export function TeamFeaturesModal({ open, onOpenChange }: TeamFeaturesModalProps) {
@@ -48,45 +48,33 @@ export function TeamFeaturesModal({ open, onOpenChange }: TeamFeaturesModalProps
         </DialogHeader>
 
         <div className="overflow-y-auto min-h-0 space-y-4 -mx-4 px-4 sm:-mx-6 sm:px-6">
-          {/* Feature list */}
           <div className="space-y-1">
             {FEATURES.map((f) => {
               const Icon = f.icon;
-              const dimmed = "comingSoon" in f && f.comingSoon;
               return (
                 <div
                   key={f.key}
-                  className={`group grid grid-cols-[1fr_40px] items-center gap-2 rounded-lg px-3 py-2.5 hover:bg-muted/30 ${dimmed ? "opacity-40" : ""}`}
+                  className="group grid grid-cols-[1fr_40px] items-center gap-2 rounded-lg px-3 py-2.5 hover:bg-muted/30"
                 >
                   <div className="flex items-start gap-3 min-w-0">
                     <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                     <div className="min-w-0">
-                      <p className="text-sm font-medium flex items-center gap-2">
-                        {t(`settings.versionModal.${f.key}`)}
-                        {dimmed && (
-                          <Badge variant="outline" className="text-[9px] px-1.5 py-0 font-normal">
-                            {t("settings.versionModal.comingSoon")}
-                          </Badge>
-                        )}
+                      <p className="text-sm font-medium">
+                        {String(t(`settings.versionModal.${f.key}`))}
                       </p>
                       <p className="text-xs text-muted-foreground leading-relaxed">
-                        {t(`settings.versionModal.${f.key}Desc`)}
+                        {String(t(`settings.versionModal.${f.key}Desc`))}
                       </p>
                     </div>
                   </div>
                   <div className="flex justify-center">
-                    {dimmed ? (
-                      <Minus className="h-4 w-4 text-muted-foreground/30" />
-                    ) : (
-                      <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
-                    )}
+                    <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
                   </div>
                 </div>
               );
             })}
           </div>
 
-          {/* Notes */}
           <div className="space-y-1 rounded-lg border bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
             <p>{t("settings.versionModal.betaNote")}</p>
           </div>

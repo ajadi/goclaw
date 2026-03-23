@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Settings, Trash2, Users } from "lucide-react";
+import { ArrowLeft, Clock, Settings, Trash2, Users } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { TeamData, TeamMemberData } from "@/types/team";
 import { TeamFeaturesModal } from "../team-features-modal";
+import { TeamAuditLogsModal } from "../team-audit-logs-modal";
 
 interface BoardHeaderProps {
   team: TeamData;
@@ -18,6 +19,7 @@ interface BoardHeaderProps {
 export function BoardHeader({ team, members, onBack, onDelete, onSettings, onMembers }: BoardHeaderProps) {
   const { t } = useTranslation("teams");
   const [featuresOpen, setFeaturesOpen] = useState(false);
+  const [auditLogsOpen, setAuditLogsOpen] = useState(false);
   const leadMember = members.find((m) => m.role === "lead");
   const leadName = leadMember?.display_name || leadMember?.agent_key
     || team.lead_display_name || team.lead_agent_key;
@@ -59,6 +61,10 @@ export function BoardHeader({ team, members, onBack, onDelete, onSettings, onMem
         <Users className="h-4 w-4" />
         <span className="hidden sm:inline">{t("members.title")}</span>
       </Button>
+      <Button variant="ghost" size="sm" onClick={() => setAuditLogsOpen(true)} className="shrink-0 gap-1.5">
+        <Clock className="h-4 w-4" />
+        <span className="hidden sm:inline">{t("auditLogs.title")}</span>
+      </Button>
       <Button variant="ghost" size="sm" onClick={onSettings} className="shrink-0 gap-1.5">
         <Settings className="h-4 w-4" />
         <span className="hidden sm:inline">{t("detail.tabs.settings")}</span>
@@ -74,6 +80,7 @@ export function BoardHeader({ team, members, onBack, onDelete, onSettings, onMem
       </Button>
 
       <TeamFeaturesModal open={featuresOpen} onOpenChange={setFeaturesOpen} />
+      <TeamAuditLogsModal open={auditLogsOpen} onOpenChange={setAuditLogsOpen} teamId={team.id} />
     </div>
   );
 }

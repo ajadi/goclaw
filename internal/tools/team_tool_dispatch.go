@@ -83,7 +83,8 @@ func (m *TeamToolManager) dispatchTaskToAgent(ctx context.Context, task *store.T
 	// Hint: guide member on available team_tasks actions.
 	content += "\n\n[Instructions]\n" +
 		"- Use team_tasks(action=\"progress\", percent=N, text=\"...\") to report progress\n" +
-		"- Use team_tasks(action=\"comment\", text=\"...\") to share findings or ask questions — comments are included in the task report sent to the leader\n" +
+		"- Use team_tasks(action=\"comment\", text=\"...\") to share findings\n" +
+		"- Use team_tasks(action=\"comment\", type=\"blocker\", text=\"...\") when BLOCKED and need leader input — auto-fails task and notifies leader\n" +
 		"- When done: team_tasks(action=\"complete\", result=\"summary of your work\")\n" +
 		"- Write output files to team workspace so lead can review"
 

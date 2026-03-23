@@ -151,6 +151,7 @@ export const Methods = {
   TEAMS_WORKSPACE_LIST: "teams.workspace.list",
   TEAMS_WORKSPACE_READ: "teams.workspace.read",
   TEAMS_WORKSPACE_DELETE: "teams.workspace.delete",
+  TEAMS_EVENTS_LIST: "teams.events.list",
 
   // Heartbeat
   HEARTBEAT_GET: "heartbeat.get",

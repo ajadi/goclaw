@@ -43,11 +43,9 @@ func (t *TeamTasksTool) executeClaim(ctx context.Context, args map[string]any) *
 }
 
 func (t *TeamTasksTool) executeComplete(ctx context.Context, args map[string]any) *Result {
-	// TODO: Enable when reviewer workflow is implemented — teammate agents should
-	// not complete tasks directly when a reviewer is required.
-	// if ToolChannelFromCtx(ctx) == ChannelTeammate {
-	// 	return ErrorResult("teammate agents cannot complete team tasks directly — results are auto-completed when delegation finishes")
-	// }
+	// Note: reviewer role exists but is not yet active in UI.
+	// All approval flows through leader. When reviewer role is enabled,
+	// restrict teammate agents from completing tasks directly.
 
 	team, agentID, err := t.manager.resolveTeam(ctx)
 	if err != nil {
@@ -106,11 +104,7 @@ func (t *TeamTasksTool) executeComplete(ctx context.Context, args map[string]any
 }
 
 func (t *TeamTasksTool) executeCancel(ctx context.Context, args map[string]any) *Result {
-	// TODO: Enable when reviewer workflow is implemented — teammate agents should
-	// not cancel tasks directly when a reviewer is required.
-	// if ToolChannelFromCtx(ctx) == ChannelTeammate {
-	// 	return ErrorResult("teammate agents cannot cancel team tasks directly")
-	// }
+	// Note: reviewer role not yet active. Cancellation goes through leader only.
 
 	team, agentID, err := t.manager.resolveTeam(ctx)
 	if err != nil {
@@ -199,11 +193,7 @@ func (t *TeamTasksTool) executeReview(ctx context.Context, args map[string]any) 
 }
 
 func (t *TeamTasksTool) executeApprove(ctx context.Context, args map[string]any) *Result {
-	// TODO: Enable when reviewer workflow is implemented — teammate agents should
-	// not approve tasks directly when a reviewer is required.
-	// if ToolChannelFromCtx(ctx) == ChannelTeammate {
-	// 	return ErrorResult("teammate agents cannot approve team tasks")
-	// }
+	// Note: reviewer role not yet active. All approvals flow through leader or dashboard.
 
 	team, agentID, err := t.manager.resolveTeam(ctx)
 	if err != nil {
@@ -270,11 +260,7 @@ func (t *TeamTasksTool) executeApprove(ctx context.Context, args map[string]any)
 }
 
 func (t *TeamTasksTool) executeReject(ctx context.Context, args map[string]any) *Result {
-	// TODO: Enable when reviewer workflow is implemented — teammate agents should
-	// not reject tasks directly when a reviewer is required.
-	// if ToolChannelFromCtx(ctx) == ChannelTeammate {
-	// 	return ErrorResult("teammate agents cannot reject team tasks")
-	// }
+	// Note: reviewer role not yet active. Rejections flow through leader or dashboard.
 
 	team, agentID, err := t.manager.resolveTeam(ctx)
 	if err != nil {

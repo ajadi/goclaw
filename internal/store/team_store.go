@@ -137,12 +137,13 @@ type TeamTaskData struct {
 
 // TeamTaskCommentData represents a comment on a team task.
 type TeamTaskCommentData struct {
-	ID        uuid.UUID  `json:"id"`
-	TaskID    uuid.UUID  `json:"task_id"`
-	AgentID   *uuid.UUID `json:"agent_id,omitempty"`
-	UserID    string     `json:"user_id,omitempty"`
-	Content   string     `json:"content"`
-	CreatedAt time.Time  `json:"created_at"`
+	ID          uuid.UUID  `json:"id"`
+	TaskID      uuid.UUID  `json:"task_id"`
+	AgentID     *uuid.UUID `json:"agent_id,omitempty"`
+	UserID      string     `json:"user_id,omitempty"`
+	Content     string     `json:"content"`
+	CommentType string     `json:"comment_type,omitempty"` // "note" (default) or "blocker"
+	CreatedAt   time.Time  `json:"created_at"`
 
 	// Joined
 	AgentKey string `json:"agent_key,omitempty"`

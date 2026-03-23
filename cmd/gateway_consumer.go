@@ -108,6 +108,12 @@ func consumeInboundMessages(ctx context.Context, msgBus *bus.MessageBus, agents 
 			continue
 		}
 
+		// Blocker escalation messages bypass debounce — deliver immediately to leader.
+		if msg.SenderID == "system:escalation" {
+			go processNormalMessage(ctx, msg, agents, cfg, sched, channelMgr, teamStore, quotaChecker, sessStore, agentStore, contactCollector, postTurn, msgBus)
+			continue
+		}
+
 		// --- Normal messages: route through debouncer ---
 		debouncer.Push(msg)
 	}

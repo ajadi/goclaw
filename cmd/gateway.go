@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -546,11 +547,31 @@ func runGateway() {
 			if err != nil {
 				return
 			}
-			if err := teamEventStore.RecordTaskEvent(context.Background(), &store.TeamTaskEventData{
+
+			// Propagate tenant from bus event to ensure correct tenant isolation.
+			auditCtx := store.WithTenantID(context.Background(), evt.TenantID)
+
+			// Populate data field with event-specific context for audit trail.
+			var data json.RawMessage
+			switch evt.Name {
+			case protocol.EventTeamTaskFailed, protocol.EventTeamTaskRejected, protocol.EventTeamTaskCancelled:
+				if payload.Reason != "" {
+					data, _ = json.Marshal(map[string]string{"reason": payload.Reason})
+				}
+			case protocol.EventTeamTaskCommented:
+				if payload.CommentText != "" {
+					data, _ = json.Marshal(map[string]string{"comment_text": payload.CommentText})
+				}
+			case protocol.EventTeamTaskProgress:
+				data, _ = json.Marshal(map[string]any{"progress_percent": payload.ProgressPercent, "progress_step": payload.ProgressStep})
+			}
+
+			if err := teamEventStore.RecordTaskEvent(auditCtx, &store.TeamTaskEventData{
 				TaskID:    taskID,
 				EventType: eventType,
 				ActorType: payload.ActorType,
 				ActorID:   payload.ActorID,
+				Data:      data,
 			}); err != nil {
 				slog.Warn("team_task_audit.record_failed", "task_id", payload.TaskID, "event", eventType, "error", err)
 			}
@@ -1060,6 +1081,14 @@ func teamTaskEventType(eventName string) string {
 		return "approved"
 	case protocol.EventTeamTaskRejected:
 		return "rejected"
+	case protocol.EventTeamTaskCommented:
+		return "commented"
+	case protocol.EventTeamTaskProgress:
+		return "progress"
+	case protocol.EventTeamTaskUpdated:
+		return "updated"
+	case protocol.EventTeamTaskStale:
+		return "stale"
 	default:
 		return ""
 	}

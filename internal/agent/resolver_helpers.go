@@ -130,6 +130,10 @@ func buildTeamMD(team *store.TeamData, members []store.TeamMemberData, selfID uu
 			sb.WriteString("\n## Communication\n\n")
 			sb.WriteString("Use `team_tasks(action=\"comment\")` to report issues or ask questions on your current task.\n")
 		}
+		sb.WriteString("\n## Blocker Escalation\n\n")
+		sb.WriteString("If blocked (missing info, unclear requirements, need credentials):\n")
+		sb.WriteString("```\nteam_tasks(action=\"comment\", type=\"blocker\", text=\"what you need\")\n```\n")
+		sb.WriteString("This auto-fails the task and notifies the leader, who can retry with updated instructions.\n")
 	}
 
 	return sb.String()

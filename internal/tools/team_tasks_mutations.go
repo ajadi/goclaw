@@ -309,10 +309,16 @@ func (t *TeamTasksTool) executeComment(ctx context.Context, args map[string]any)
 		return ErrorResult("task does not belong to your team")
 	}
 
+	commentType, _ := args["type"].(string)
+	if commentType != "blocker" {
+		commentType = "note"
+	}
+
 	if err := t.manager.teamStore.AddTaskComment(ctx, &store.TeamTaskCommentData{
-		TaskID:  taskID,
-		AgentID: &agentID,
-		Content: text,
+		TaskID:      taskID,
+		AgentID:     &agentID,
+		Content:     text,
+		CommentType: commentType,
 	}); err != nil {
 		return ErrorResult("failed to add comment: " + err.Error())
 	}
@@ -331,6 +337,11 @@ func (t *TeamTasksTool) executeComment(ctx context.Context, args map[string]any)
 		ActorID:     t.manager.agentKeyFromID(ctx, agentID),
 	})
 
+	// Blocker escalation: auto-fail task + notify leader.
+	if commentType == "blocker" {
+		return t.handleBlockerComment(ctx, team, task, taskID, agentID, text)
+	}
+
 	isLead := agentID == team.LeadAgentID
 	msg := fmt.Sprintf("Comment added to task #%d \"%s\" (id: %s).", task.TaskNumber, task.Subject, taskID)
 	switch {
@@ -345,6 +356,7 @@ func (t *TeamTasksTool) executeComment(ctx context.Context, args map[string]any)
 	}
 	return NewResult(msg)
 }
+
 
 func (t *TeamTasksTool) executeProgress(ctx context.Context, args map[string]any) *Result {
 	team, agentID, err := t.manager.resolveTeam(ctx)

@@ -83,6 +83,8 @@ export function TeamSettingsTab({ teamId, team, onSaved }: TeamSettingsTabProps)
   const [memberRequestsAutoDispatch, setMemberRequestsAutoDispatch] = useState(initMemberRequests.auto_dispatch ?? false);
   const [escalationMode, setEscalationMode] = useState<EscalationMode | "">(initial.escalation_mode ?? "");
   const [escalationActions, setEscalationActions] = useState<EscalationAction[]>(initial.escalation_actions ?? []);
+  const initBlockerEscalation = initial.blocker_escalation ?? {};
+  const [blockerEscalationEnabled, setBlockerEscalationEnabled] = useState(initBlockerEscalation.enabled ?? true);
   const [followupInterval, setFollowupInterval] = useState<number>(initial.followup_interval_minutes ?? 30);
   const [followupMaxReminders, setFollowupMaxReminders] = useState<number>(initial.followup_max_reminders ?? 0);
   const [workspaceScope, setWorkspaceScope] = useState<string>(initial.workspace_scope ?? "isolated");
@@ -105,9 +107,9 @@ export function TeamSettingsTab({ teamId, team, onSaved }: TeamSettingsTabProps)
     setNotifyDispatched(sn.dispatched ?? true);
     setNotifyProgress(sn.progress ?? true);
     setNotifyFailed(sn.failed ?? true);
-    setNotifyCompleted(sn.completed ?? false);
-    setNotifyCommented(sn.commented ?? false);
-    setNotifyNewTask(sn.new_task ?? false);
+    setNotifyCompleted(sn.completed ?? true);
+    setNotifyCommented(sn.commented ?? true);
+    setNotifyNewTask(sn.new_task ?? true);
     setNotifySlowTool(sn.slow_tool ?? true);
     setNotifyMode(sn.mode ?? "direct");
     const smr = s.member_requests ?? {};
@@ -115,6 +117,8 @@ export function TeamSettingsTab({ teamId, team, onSaved }: TeamSettingsTabProps)
     setMemberRequestsAutoDispatch(smr.auto_dispatch ?? false);
     setEscalationMode(s.escalation_mode ?? "");
     setEscalationActions(s.escalation_actions ?? []);
+    const sbe = s.blocker_escalation ?? {};
+    setBlockerEscalationEnabled(sbe.enabled ?? true);
     setFollowupInterval(s.followup_interval_minutes ?? 30);
     setFollowupMaxReminders(s.followup_max_reminders ?? 0);
     setWorkspaceScope(s.workspace_scope ?? "isolated");
@@ -149,6 +153,7 @@ export function TeamSettingsTab({ teamId, team, onSaved }: TeamSettingsTabProps)
         settings.escalation_mode = escalationMode;
         if (escalationActions.length > 0) settings.escalation_actions = escalationActions;
       }
+      settings.blocker_escalation = { enabled: blockerEscalationEnabled };
       if (followupInterval !== 30) settings.followup_interval_minutes = followupInterval;
       if (followupMaxReminders !== 0) settings.followup_max_reminders = followupMaxReminders;
       settings.workspace_scope = workspaceScope || "isolated";
@@ -158,7 +163,7 @@ export function TeamSettingsTab({ teamId, team, onSaved }: TeamSettingsTabProps)
     } finally {
       setSaving(false);
     }
-  }, [teamId, allowUserIds, denyUserIds, allowChannels, denyChannels, notifyDispatched, notifyProgress, notifyFailed, notifyCompleted, notifyCommented, notifyNewTask, notifySlowTool, notifyMode, memberRequestsEnabled, memberRequestsAutoDispatch, escalationMode, escalationActions, followupInterval, followupMaxReminders, workspaceScope, updateTeamSettings, onSaved]);
+  }, [teamId, allowUserIds, denyUserIds, allowChannels, denyChannels, notifyDispatched, notifyProgress, notifyFailed, notifyCompleted, notifyCommented, notifyNewTask, notifySlowTool, notifyMode, memberRequestsEnabled, memberRequestsAutoDispatch, escalationMode, escalationActions, blockerEscalationEnabled, followupInterval, followupMaxReminders, workspaceScope, updateTeamSettings, onSaved]);
 
   const userOptions = knownUsers.map((u) => ({ value: u, label: u }));
   const channelOptions = CHANNEL_TYPES.map((c) => ({ value: c.value, label: c.label }));
@@ -328,22 +333,24 @@ export function TeamSettingsTab({ teamId, team, onSaved }: TeamSettingsTabProps)
         </div>
       </div>
 
-      {/* Escalation Policy (coming soon) */}
-      <div className="space-y-4 opacity-40 pointer-events-none select-none">
-        <h3 className="text-sm font-medium flex items-center gap-2">
-          {t("settings.escalationPolicy")}
-          <span className="rounded border px-1.5 py-0.5 text-[9px] font-normal text-muted-foreground">{t("settings.versionModal.comingSoon")}</span>
-        </h3>
+      {/* Blocker Escalation */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-medium">{t("settings.blockerEscalation")}</h3>
         <div className="rounded-lg border bg-gradient-to-r from-orange-500/5 to-red-500/5 p-4">
           <div className="flex items-start gap-4">
             <div className="rounded-lg bg-orange-500/10 p-2.5 text-orange-600 dark:text-orange-400">
               <ShieldAlert className="h-5 w-5" />
             </div>
-            <div className="flex-1 space-y-1">
-              <span className="text-sm font-semibold">{t("settings.escalationMode")}</span>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                {t("settings.escalationModeHint")}
-              </p>
+            <div className="flex-1 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <span className="text-sm font-semibold">{t("settings.blockerEscalationEnabled")}</span>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    {t("settings.blockerEscalationHint")}
+                  </p>
+                </div>
+                <Switch checked={blockerEscalationEnabled} onCheckedChange={setBlockerEscalationEnabled} />
+              </div>
             </div>
           </div>
         </div>

@@ -52,6 +52,10 @@ func (t *TeamTasksTool) Parameters() map[string]any {
 				"type":        "string",
 				"description": "Text content: comment text, cancel/reject reason, progress update, or ask_user reminder question (must be a question asking the user for input/decision)",
 			},
+			"type": map[string]any{
+				"type":        "string",
+				"description": "Comment type for action=comment: 'note' (default, share findings) or 'blocker' (you are BLOCKED and need leader input — auto-fails task and notifies leader)",
+			},
 			"status": map[string]any{
 				"type":        "string",
 				"description": "Filter for list: '' (all, default), 'active', 'completed', 'in_review'",
