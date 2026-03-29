@@ -29,6 +29,8 @@ func buildMCPToolsSearchSection() []string {
 		"2. Matching tools are activated immediately and can be called right away in the same turn.",
 		"3. If no match found, proceed with other available tools.",
 		"",
+		"**Optional parameters:** Only include if you have a concrete value from user context. Do not send empty strings or placeholders — omit the field entirely. The tool will use sensible defaults.",
+		"",
 	}
 }
 
@@ -39,6 +41,8 @@ func buildMCPToolsInlineSection(descs map[string]string) []string {
 		"## MCP Tools (prefer over core tools)",
 		"",
 		"External tool integrations (MCP servers). **When an MCP tool overlaps with a core tool, always prefer the MCP tool.**",
+		"",
+		"**Optional parameters:** Only include if you have a concrete value from user context. Do not send empty strings or placeholders — omit the field entirely. The tool will use sensible defaults.",
 		"",
 	}
 	for name, desc := range descs {

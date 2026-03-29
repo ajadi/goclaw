@@ -20,6 +20,7 @@ type BridgeTool struct {
 	registeredName string // may include prefix: "{prefix}__{toolName}"
 	description    string
 	inputSchema    map[string]any // JSON Schema for parameters
+	requiredSet    map[string]bool
 	client         *mcpclient.Client
 	timeoutSec     int
 	connected      *atomic.Bool
@@ -39,12 +40,18 @@ func NewBridgeTool(serverName string, mcpTool mcpgo.Tool, client *mcpclient.Clie
 
 	schema := inputSchemaToMap(mcpTool.InputSchema)
 
+	reqSet := make(map[string]bool, len(mcpTool.InputSchema.Required))
+	for _, r := range mcpTool.InputSchema.Required {
+		reqSet[r] = true
+	}
+
 	return &BridgeTool{
 		serverName:     serverName,
 		toolName:       name,
 		registeredName: registered,
 		description:    mcpTool.Description,
 		inputSchema:    schema,
+		requiredSet:    reqSet,
 		client:         client,
 		timeoutSec:     timeoutSec,
 		connected:      connected,
@@ -91,9 +98,14 @@ func (t *BridgeTool) Execute(ctx context.Context, args map[string]any) *tools.Re
 	callCtx, cancel := context.WithTimeout(ctx, time.Duration(t.timeoutSec)*time.Second)
 	defer cancel()
 
+	// Strip empty-value optional args. LLMs often send "" for optional fields
+	// instead of omitting them, causing MCP servers to reject invalid values
+	// (e.g. empty string for UUID fields).
+	cleanedArgs := t.stripEmptyOptionalArgs(args)
+
 	req := mcpgo.CallToolRequest{}
 	req.Params.Name = t.toolName
-	req.Params.Arguments = args
+	req.Params.Arguments = cleanedArgs
 
 	result, err := t.client.CallTool(callCtx, req)
 	if err != nil {
@@ -136,6 +148,70 @@ func inputSchemaToMap(schema mcpgo.ToolInputSchema) map[string]any {
 		m["additionalProperties"] = schema.AdditionalProperties
 	}
 	return m
+}
+
+// stripEmptyOptionalArgs removes optional args with empty/placeholder values.
+// LLMs often send "" or placeholder strings (e.g. "__OMIT__", "null", "none")
+// for optional fields instead of omitting them, causing MCP servers to reject
+// invalid values (e.g. empty string for UUID fields).
+func (t *BridgeTool) stripEmptyOptionalArgs(args map[string]any) map[string]any {
+	if len(args) == 0 {
+		return args
+	}
+	cleaned := make(map[string]any, len(args))
+	for k, v := range args {
+		if t.requiredSet[k] {
+			cleaned[k] = v
+			continue
+		}
+		// Strip nil for optional fields.
+		if v == nil {
+			continue
+		}
+		// Strip empty strings and common LLM placeholder values for optional fields.
+		if s, ok := v.(string); ok && isPlaceholderValue(s) {
+			continue
+		}
+		cleaned[k] = v
+	}
+	return cleaned
+}
+
+// isPlaceholderValue returns true for empty or placeholder strings that LLMs
+// commonly use when they don't intend to set an optional parameter.
+func isPlaceholderValue(s string) bool {
+	// NOTE: empty string "" is NOT stripped — it may be intentional for text fields.
+	// Only strip known placeholder keywords and all-caps patterns.
+	if s == "" {
+		return false
+	}
+	// Normalize for case-insensitive comparison.
+	lower := strings.ToLower(strings.TrimSpace(s))
+	switch lower {
+	case "null", "none", "nil", "undefined", "n/a",
+		"__omit__", "__skip__", "__empty__":
+		return true
+	}
+	// Catch all-caps placeholder patterns like "SHOULD_NOT_BE_HERE", "DO_NOT_SEND", "NOT_SET".
+	if isAllCapsPlaceholder(s) {
+		return true
+	}
+	return false
+}
+
+// isAllCapsPlaceholder detects LLM-generated all-caps placeholder strings
+// like "SHOULD_NOT_BE_HERE", "DO_NOT_SEND", "NOT_APPLICABLE", "PLACEHOLDER".
+func isAllCapsPlaceholder(s string) bool {
+	trimmed := strings.TrimSpace(s)
+	if len(trimmed) < 3 {
+		return false
+	}
+	for _, r := range trimmed {
+		if r != '_' && (r < 'A' || r > 'Z') {
+			return false
+		}
+	}
+	return true
 }
 
 // wrapMCPContent wraps MCP tool results as external/untrusted content.
