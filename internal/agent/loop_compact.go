@@ -17,6 +17,9 @@ const compactionSummaryPrompt = `Summarize this conversation concisely for the A
 
 MUST PRESERVE:
 - Active tasks and their current status (in-progress, blocked, pending)
+- Pending subagent tasks (IDs, labels, statuses) — agent needs to know what is still running
+- Pending team task results awaiting delivery (task IDs, assignees, statuses)
+- Any "waiting for..." state — do NOT drop expectations of future results
 - Batch operation progress (e.g., "5/17 items completed")
 - The last thing the user requested and what was being done about it
 - Decisions made and their rationale
