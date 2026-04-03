@@ -40,6 +40,12 @@ func isOpenAINativeEndpoint(apiBase string) bool {
 	return strings.Contains(lower, "api.openai.com")
 }
 
+// isFireworksEndpoint returns true for Fireworks AI endpoints.
+// Fireworks requires stream=true for max_tokens > 4096.
+func (p *OpenAIProvider) isFireworksEndpoint() bool {
+	return strings.Contains(strings.ToLower(p.apiBase), "fireworks.ai")
+}
+
 func NewOpenAIProvider(name, apiKey, apiBase, defaultModel string) *OpenAIProvider {
 	if apiBase == "" {
 		apiBase = "https://api.openai.com/v1"
@@ -407,6 +413,15 @@ func (p *OpenAIProvider) buildRequestBody(model string, req ChatRequest, stream 
 	// Merge options
 	capabilityModel := modelFamily(model)
 	if v, ok := req.Options[OptMaxTokens]; ok {
+		// Fireworks requires stream=true for max_tokens > 4096.
+		// Clamp proactively to avoid a 400 round-trip (their error format
+		// doesn't match the generic clampMaxTokensFromError regex).
+		if !stream && p.isFireworksEndpoint() {
+			if maxTokens, isInt := v.(int); isInt && maxTokens > 4096 {
+				v = 4096
+				slog.Debug("max_tokens clamped to 4096 for Fireworks non-streaming request", "provider", p.name, "model", model)
+			}
+		}
 		if strings.HasPrefix(capabilityModel, "gpt-5") || strings.HasPrefix(capabilityModel, "o1") || strings.HasPrefix(capabilityModel, "o3") || strings.HasPrefix(capabilityModel, "o4") {
 			body["max_completion_tokens"] = v
 		} else {
