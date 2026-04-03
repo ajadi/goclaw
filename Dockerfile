@@ -95,7 +95,7 @@ RUN set -eux; \
         fi; \
     fi; \
     if [ "$ENABLE_CLAUDE_CLI" = "true" ]; then \
-        npm install -g --cache /tmp/npm-cache @anthropic-ai/claude-code@^1.0.47; \
+        npm install -g --cache /tmp/npm-cache @anthropic-ai/claude-code@^2.1.91; \
         rm -rf /tmp/npm-cache; \
     fi; \
     rm -f /tmp/requirements-base.txt /tmp/requirements-skills.txt
