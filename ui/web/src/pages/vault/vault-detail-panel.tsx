@@ -172,7 +172,7 @@ export function VaultDetailPanel({ doc, open, onClose, onDeleted }: Props) {
       </div>
 
       {linkDialogOpen && (
-        <VaultLinkDialog agentId={doc.agent_id} fromDoc={doc}
+        <VaultLinkDialog agentId={doc.agent_id ?? ""} fromDoc={doc}
           open={linkDialogOpen} onOpenChange={setLinkDialogOpen} />
       )}
     </>

@@ -88,6 +88,25 @@ func (s *PGVaultStore) GetOutLinks(ctx context.Context, tenantID, docID string) 
 	return scanVaultLinks(rows)
 }
 
+// GetOutLinksBatch returns all outlinks for multiple doc IDs in a single query.
+func (s *PGVaultStore) GetOutLinksBatch(ctx context.Context, tenantID string, docIDs []string) ([]store.VaultLink, error) {
+	if len(docIDs) == 0 {
+		return nil, nil
+	}
+	tid := mustParseUUID(tenantID)
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT vl.id, vl.from_doc_id, vl.to_doc_id, vl.link_type, vl.context, vl.created_at
+		FROM vault_links vl
+		JOIN vault_documents vd ON vl.from_doc_id = vd.id
+		WHERE vl.from_doc_id = ANY($1) AND vd.tenant_id = $2
+		ORDER BY vl.created_at`, pqStringArray(docIDs), tid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanVaultLinks(rows)
+}
+
 // GetBacklinks returns enriched backlinks pointing to a document (single JOIN, LIMIT 100).
 func (s *PGVaultStore) GetBacklinks(ctx context.Context, tenantID, docID string) ([]store.VaultBacklink, error) {
 	did := mustParseUUID(docID)

@@ -76,97 +76,87 @@ export function SigmaGraphContainer({
   useEffect(() => {
     if (!containerRef.current || graph.order === 0) return;
 
-    // Step 1: Detect communities with Louvain, then seed nodes spatially per community.
-    // This breaks the "ring" pattern that FA2 + circular init produces on sparse graphs.
+    // Layout: community-seeded FA2 for dense graphs, random+FA2 for sparse.
     if (graph.order > 1) {
-      // Detect communities — Louvain returns { nodeId: communityId }
-      const communities = louvain(graph, { resolution: 1 });
+      const edgeDensity = graph.size / graph.order; // edges per node
 
-      // Group nodes by community
-      const communityGroups = new Map<number, string[]>();
-      for (const node of graph.nodes()) {
-        const c = communities[node] ?? 0;
-        if (!communityGroups.has(c)) communityGroups.set(c, []);
-        communityGroups.get(c)!.push(node);
+      if (edgeDensity >= 0.8) {
+        // Dense graph: Louvain community detection → grid seed → FA2 refinement.
+        const communities = louvain(graph, { resolution: 1 });
+        const communityGroups = new Map<number, string[]>();
+        for (const node of graph.nodes()) {
+          const c = communities[node] ?? 0;
+          if (!communityGroups.has(c)) communityGroups.set(c, []);
+          communityGroups.get(c)!.push(node);
+        }
+        const communityIds = Array.from(communityGroups.keys())
+          .sort((a, b) => communityGroups.get(b)!.length - communityGroups.get(a)!.length);
+        const numCommunities = communityIds.length;
+        const maxCommunitySize = Math.max(
+          ...Array.from(communityGroups.values(), (nodes) => nodes.length),
+        );
+        const cellSize = Math.max(Math.sqrt(maxCommunitySize) * 28, 140);
+        const cols = Math.ceil(Math.sqrt(numCommunities * 1.4));
+        const gridWidth = cols * cellSize;
+        const gridHeight = Math.ceil(numCommunities / cols) * cellSize;
+        const jitter = (seed: number) => {
+          const x = Math.sin(seed * 9999) * 10000;
+          return (x - Math.floor(x)) - 0.5;
+        };
+        communityIds.forEach((cId, idx) => {
+          const nodes = communityGroups.get(cId)!;
+          const col = idx % cols;
+          const row = Math.floor(idx / cols);
+          const cx = col * cellSize - gridWidth / 2 + cellSize / 2 + jitter(idx) * cellSize * 0.2;
+          const cy = row * cellSize - gridHeight / 2 + cellSize / 2 + jitter(idx + 1000) * cellSize * 0.2;
+          const localRadius = Math.max(Math.sqrt(nodes.length) * 12, 25);
+          nodes.forEach((nodeId, i) => {
+            const angle = (i / nodes.length) * Math.PI * 2;
+            const r = localRadius * (0.6 + Math.abs(jitter(i + idx * 100)) * 0.7);
+            graph.setNodeAttribute(nodeId, "x", cx + Math.cos(angle) * r);
+            graph.setNodeAttribute(nodeId, "y", cy + Math.sin(angle) * r);
+          });
+        });
+      } else {
+        // Sparse graph: random disc init with uniform area distribution.
+        const spread = Math.sqrt(graph.order) * 20;
+        const nodes = graph.nodes();
+        for (let i = 0; i < nodes.length; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          const r = Math.sqrt(Math.random()) * spread;
+          graph.setNodeAttribute(nodes[i], "x", Math.cos(angle) * r);
+          graph.setNodeAttribute(nodes[i], "y", Math.sin(angle) * r);
+        }
       }
 
-      // Sort communities by size (big ones placed first / more central)
-      const communityIds = Array.from(communityGroups.keys())
-        .sort((a, b) => communityGroups.get(b)!.length - communityGroups.get(a)!.length);
-      const numCommunities = communityIds.length;
-
-      // Cell size derived from the LARGEST community — smaller clusters get same cell
-      // but will pack tighter via noverlap post-processing.
-      const maxCommunitySize = Math.max(
-        ...Array.from(communityGroups.values(), (nodes) => nodes.length),
-      );
-      // Each node contributes ~12 units of space (node size ~5-12 + margin)
-      const cellSize = Math.max(Math.sqrt(maxCommunitySize) * 28, 140);
-
-      // Grid dimensions — aim for slightly wide aspect (4:3)
-      const cols = Math.ceil(Math.sqrt(numCommunities * 1.4));
-      const rows = Math.ceil(numCommunities / cols);
-      const gridWidth = cols * cellSize;
-      const gridHeight = rows * cellSize;
-
-      // Deterministic pseudo-random for jitter (breaks grid rigidity)
-      const jitter = (seed: number) => {
-        const x = Math.sin(seed * 9999) * 10000;
-        return (x - Math.floor(x)) - 0.5;
-      };
-
-      communityIds.forEach((cId, idx) => {
-        const nodesInCommunity = communityGroups.get(cId)!;
-        const col = idx % cols;
-        const row = Math.floor(idx / cols);
-        // Cell center with slight jitter
-        const cx = col * cellSize - gridWidth / 2 + cellSize / 2 + jitter(idx) * cellSize * 0.2;
-        const cy = row * cellSize - gridHeight / 2 + cellSize / 2 + jitter(idx + 1000) * cellSize * 0.2;
-        // Local radius: scales with community size — bigger community = bigger circle
-        // Uses sqrt so large clusters don't balloon out of proportion
-        const localRadius = Math.max(Math.sqrt(nodesInCommunity.length) * 12, 25);
-
-        nodesInCommunity.forEach((nodeId, i) => {
-          const localAngle = (i / nodesInCommunity.length) * Math.PI * 2;
-          const jitterR = localRadius * (0.6 + Math.abs(jitter(i + idx * 100)) * 0.7);
-          const x = cx + Math.cos(localAngle) * jitterR;
-          const y = cy + Math.sin(localAngle) * jitterR;
-          graph.setNodeAttribute(nodeId, "x", x);
-          graph.setNodeAttribute(nodeId, "y", y);
-        });
-      });
-
-      // Step 2: Run FA2 with community-aware settings.
-      // Since we have community seeds, FA2 just refines (doesn't completely re-layout).
-      const iterations = graph.order < 100 ? 250 : graph.order < 500 ? 180 : 100;
+      // FA2 layout — Gephi-like defaults tuned per density.
+      // Sparse: gravity ≈ repulsion so orphans form loose cloud (not ring/grid).
+      // Dense: lower gravity, community seeds provide structure.
+      const isSparse = edgeDensity < 0.8;
+      const iterations = graph.order < 100 ? 300 : graph.order < 500 ? 200 : 120;
       forceAtlas2.assign(graph, {
         iterations,
         settings: {
-          // Standard FA2 (NOT linLogMode — causes ring collapse)
           linLogMode: false,
           outboundAttractionDistribution: false,
-          // Moderate gravity — pulls clusters slightly closer (prevents drift)
-          gravity: 0.15,
-          // Moderate repulsion — less aggressive spacing
-          scalingRatio: 8,
-          adjustSizes: true,
+          gravity: isSparse ? 3.0 : 0.15,
+          scalingRatio: isSparse ? 5.0 : 8,
+          adjustSizes: false,
           strongGravityMode: false,
-          slowDown: 8,
+          slowDown: 6,
           barnesHutOptimize: graph.order > 300,
           edgeWeightInfluence: 0,
         },
       });
 
-      // Step 3: Noverlap post-process — push apart any remaining overlaps (tight)
-      noverlap.assign(graph, {
-        maxIterations: 50,
-        settings: {
-          margin: 3,
-          ratio: 1.02,
-          speed: 3,
-          gridSize: 20,
-        },
-      });
+      // Noverlap only for dense graphs — sparse graphs rely on FA2 repulsion
+      // to space nodes naturally. Noverlap on sparse data creates grid artifacts.
+      if (!isSparse) {
+        noverlap.assign(graph, {
+          maxIterations: 50,
+          settings: { margin: 3, ratio: 1.02, speed: 3, gridSize: 20 },
+        });
+      }
     }
 
     const edgePrograms: Record<string, typeof EdgeArrowProgram> = {

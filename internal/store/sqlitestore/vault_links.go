@@ -78,6 +78,30 @@ func (s *SQLiteVaultStore) GetOutLinks(ctx context.Context, tenantID, docID stri
 	return scanVaultLinkRows(rows)
 }
 
+// GetOutLinksBatch returns all outlinks for multiple doc IDs in a single query.
+func (s *SQLiteVaultStore) GetOutLinksBatch(ctx context.Context, tenantID string, docIDs []string) ([]store.VaultLink, error) {
+	if len(docIDs) == 0 {
+		return nil, nil
+	}
+	ph := strings.Repeat("?,", len(docIDs)-1) + "?"
+	args := make([]any, 0, len(docIDs)+1)
+	for _, id := range docIDs {
+		args = append(args, id)
+	}
+	args = append(args, tenantID)
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT vl.id, vl.from_doc_id, vl.to_doc_id, vl.link_type, vl.context, vl.created_at
+		FROM vault_links vl
+		JOIN vault_documents d ON d.id = vl.from_doc_id
+		WHERE vl.from_doc_id IN (`+ph+`) AND d.tenant_id = ?
+		ORDER BY vl.created_at`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanVaultLinkRows(rows)
+}
+
 // GetBacklinks returns enriched backlinks pointing to a document (single JOIN, LIMIT 100).
 func (s *SQLiteVaultStore) GetBacklinks(ctx context.Context, tenantID, docID string) ([]store.VaultBacklink, error) {
 	rows, err := s.db.QueryContext(ctx, `

@@ -92,38 +92,14 @@ export function useVaultSearchAll() {
   return { search };
 }
 
-/** Fetch all links for a set of vault documents (for graph view). */
+/** Fetch all links for a set of vault documents (single batch query). */
 export function useVaultAllLinks(agentId: string, documents: { id: string }[]) {
   const http = useHttp();
-
   const docIds = useMemo(() => documents.map((d) => d.id), [documents]);
 
   const { data, isLoading } = useQuery({
     queryKey: [VAULT_KEY, "all-links", agentId, [...docIds].sort().join(",")],
-    queryFn: async () => {
-      if (docIds.length === 0) return [];
-      const allLinks: VaultLink[] = [];
-      const batchSize = 10;
-      for (let i = 0; i < docIds.length; i += batchSize) {
-        const batch = docIds.slice(i, i + batchSize);
-        const results = await Promise.all(
-          batch.map((id) =>
-            http.get<{ outlinks: VaultLink[]; backlinks: VaultLink[] }>(
-              `/v1/vault/documents/${id}/links`,
-            ).catch(() => ({ outlinks: [], backlinks: [] })),
-          ),
-        );
-        for (const r of results) {
-          allLinks.push(...r.outlinks);
-        }
-      }
-      const seen = new Set<string>();
-      return allLinks.filter((l) => {
-        if (seen.has(l.id)) return false;
-        seen.add(l.id);
-        return true;
-      });
-    },
+    queryFn: () => http.post<VaultLink[]>("/v1/vault/links/batch", { doc_ids: docIds }),
     enabled: docIds.length > 0,
     staleTime: 60_000,
   });
@@ -157,32 +133,11 @@ export function useVaultGraphData(agentId: string, opts?: { teamId?: string }) {
     [documents],
   );
 
-  // Fetch links for all docs via cross-agent endpoint (works for null agent_id too).
+  // Fetch all links in one batch query (single SQL, no N+1).
+  const docIds = useMemo(() => documents.map((d) => d.id), [documents]);
   const { data: linksData, isLoading: linksLoading } = useQuery({
     queryKey: [VAULT_KEY, "graph-links", docIdKey],
-    queryFn: async () => {
-      if (documents.length === 0) return [];
-      const allLinks: VaultLink[] = [];
-      const batchSize = 10;
-      for (let i = 0; i < documents.length; i += batchSize) {
-        const batch = documents.slice(i, i + batchSize);
-        const results = await Promise.all(
-          batch.map((doc) =>
-            http.get<{ outlinks: VaultLink[]; backlinks: VaultLink[] }>(
-              `/v1/vault/documents/${doc.id}/links`,
-            ).catch(() => ({ outlinks: [], backlinks: [] })),
-          ),
-        );
-        for (const r of results) allLinks.push(...r.outlinks);
-      }
-      // Dedup
-      const seen = new Set<string>();
-      return allLinks.filter((l) => {
-        if (seen.has(l.id)) return false;
-        seen.add(l.id);
-        return true;
-      });
-    },
+    queryFn: () => http.post<VaultLink[]>("/v1/vault/links/batch", { doc_ids: docIds }),
     enabled: documents.length > 0,
     staleTime: 60_000,
   });

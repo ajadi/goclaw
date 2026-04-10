@@ -116,6 +116,7 @@ func (h *VaultHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /v1/vault/documents/{docID}/links", h.auth(h.handleGetLinks))
 	mux.HandleFunc("POST /v1/vault/links", h.auth(h.handleCreateLink))
 	mux.HandleFunc("DELETE /v1/vault/links/{linkID}", h.auth(h.handleDeleteLink))
+	mux.HandleFunc("POST /v1/vault/links/batch", h.auth(h.handleBatchGetLinks))
 	mux.HandleFunc("POST /v1/vault/rescan", h.auth(h.handleRescan))
 	mux.HandleFunc("POST /v1/vault/search", h.auth(h.handleSearchAll))
 	mux.HandleFunc("GET /v1/vault/enrichment/status", h.auth(h.handleEnrichmentStatus))
@@ -600,6 +601,37 @@ func (h *VaultHandler) handleCreateLink(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	writeJSON(w, http.StatusCreated, link)
+}
+
+// handleBatchGetLinks returns all outlinks for a batch of doc IDs in one query.
+func (h *VaultHandler) handleBatchGetLinks(w http.ResponseWriter, r *http.Request) {
+	locale := extractLocale(r)
+	tenantID := store.TenantIDFromContext(r.Context())
+
+	var body struct {
+		DocIDs []string `json:"doc_ids"`
+	}
+	if !bindJSON(w, r, locale, &body) {
+		return
+	}
+	if len(body.DocIDs) == 0 {
+		writeJSON(w, http.StatusOK, []store.VaultLink{})
+		return
+	}
+	if len(body.DocIDs) > 500 {
+		body.DocIDs = body.DocIDs[:500]
+	}
+
+	links, err := h.store.GetOutLinksBatch(r.Context(), tenantID.String(), body.DocIDs)
+	if err != nil {
+		slog.Warn("vault.batch_links failed", "error", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	if links == nil {
+		links = []store.VaultLink{}
+	}
+	writeJSON(w, http.StatusOK, links)
 }
 
 // handleDeleteLink deletes a vault link.

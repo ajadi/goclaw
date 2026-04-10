@@ -278,7 +278,7 @@ export function VaultDetailDialog({ doc, open, onOpenChange, onDeleted }: Props)
 
       {linkDialogOpen && (
         <VaultLinkDialog
-          agentId={doc.agent_id}
+          agentId={doc.agent_id ?? ""}
           fromDoc={doc}
           open={linkDialogOpen}
           onOpenChange={setLinkDialogOpen}

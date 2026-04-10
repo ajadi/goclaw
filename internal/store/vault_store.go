@@ -90,6 +90,7 @@ type VaultStore interface {
 	CreateLink(ctx context.Context, link *VaultLink) error
 	DeleteLink(ctx context.Context, tenantID, id string) error
 	GetOutLinks(ctx context.Context, tenantID, docID string) ([]VaultLink, error)
+	GetOutLinksBatch(ctx context.Context, tenantID string, docIDs []string) ([]VaultLink, error)
 	GetBacklinks(ctx context.Context, tenantID, docID string) ([]VaultBacklink, error)
 	DeleteDocLinks(ctx context.Context, tenantID, docID string) error
 	DeleteDocLinksByType(ctx context.Context, tenantID, docID, linkType string) error

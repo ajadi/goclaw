@@ -37,7 +37,12 @@ export function VaultGraphView({ agentId, teamId, selectedDocId, onNodeSelect, o
   const isLimited = totalCount > nodeLimit;
   const documents = useMemo(() => limitVaultDocsByDegree(allDocs, links, nodeLimit), [allDocs, links, nodeLimit]);
   const docMap = useMemo(() => new Map(documents.map((d) => [d.id, d])), [documents]);
-  const graph = useMemo(() => buildVaultGraph(documents, links), [documents, links]);
+  // Only build graph when ALL data loaded — prevents double-render
+  // (orphan-only layout → with-links layout) that causes visual chaos.
+  const graph = useMemo(
+    () => loading ? buildVaultGraph([], []) : buildVaultGraph(documents, links),
+    [documents, links, loading],
+  );
 
   const handleNodeDoubleClick = useCallback((nodeId: string) => {
     const doc = docMap.get(nodeId);
