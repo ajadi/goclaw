@@ -239,7 +239,7 @@ export function KGEntityDetailDialog({ open, onOpenChange, agentId, entity, getE
                   </div>
                 ) : graphData ? (
                   <div className="h-[400px]">
-                    <KGGraphView entities={graphData.entities} relations={graphData.relations} />
+                    <KGGraphView entities={graphData.entities} relations={graphData.relations} compact />
                   </div>
                 ) : (
                   <div className="flex items-center justify-center h-[400px] text-sm text-muted-foreground">
