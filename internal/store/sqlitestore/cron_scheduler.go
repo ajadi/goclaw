@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/nextlevelbuilder/goclaw/internal/cron"
+	"github.com/nextlevelbuilder/goclaw/internal/safego"
 	"github.com/nextlevelbuilder/goclaw/internal/store"
 )
 
@@ -201,13 +202,8 @@ func (s *SQLiteCronStore) checkAndRunDueJobs() {
 	// due jobs. Now each job runs independently; cache is invalidated per-job.
 	for _, job := range claimedJobs {
 		go func(job store.CronJob) {
-			defer func() {
-				if r := recover(); r != nil {
-					slog.Error("cron: job execution panicked", "job_id", job.ID, "job_name", job.Name, "panic", fmt.Sprint(r))
-				}
-				// Invalidate cache so the next tick picks up the updated next_run_at.
-				s.InvalidateCache()
-			}()
+			defer safego.Recover(nil, "component", "cron_job", "job_id", job.ID, "job_name", job.Name)
+			defer s.InvalidateCache()
 			s.executeOneJob(job, handler, true)
 		}(job)
 	}

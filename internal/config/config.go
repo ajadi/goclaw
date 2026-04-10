@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -352,9 +353,11 @@ const DefaultJobTimeout = 10 * time.Minute
 // JobTimeoutDuration returns the configured job timeout or the default (10m).
 func (cc CronConfig) JobTimeoutDuration() time.Duration {
 	if cc.JobTimeout != "" {
-		if d, err := time.ParseDuration(cc.JobTimeout); err == nil && d > 0 {
+		d, err := time.ParseDuration(cc.JobTimeout)
+		if err == nil && d > 0 {
 			return d
 		}
+		slog.Warn("cron: invalid job_timeout, using default", "value", cc.JobTimeout, "default", DefaultJobTimeout)
 	}
 	return DefaultJobTimeout
 }
