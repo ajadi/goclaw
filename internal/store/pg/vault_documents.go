@@ -55,18 +55,32 @@ func (s *PGVaultStore) SetEmbeddingProvider(provider store.EmbeddingProvider) {
 func (s *PGVaultStore) Close() error { return nil }
 
 // optAgentUUID converts a nullable *string agent_id to *uuid.UUID for SQL.
-func optAgentUUID(agentID *string) *uuid.UUID {
+// Returns (nil, nil) when the input is nil or empty — a legitimate SQL NULL.
+// Returns (nil, error) on a non-empty, non-UUID input — propagating the error
+// prevents silent-nil writes that would otherwise corrupt data (pre-Phase-4
+// this helper silently returned nil on garbage input).
+// See docs/agent-identity-conventions.md (Phase 6).
+func optAgentUUID(agentID *string) (*uuid.UUID, error) {
 	if agentID == nil || *agentID == "" {
-		return nil
+		return nil, nil
 	}
-	u := mustParseUUID(*agentID)
-	return &u
+	u, err := parseUUID(*agentID)
+	if err != nil {
+		return nil, err
+	}
+	return &u, nil
 }
 
 // UpsertDocument inserts or updates a vault document.
 func (s *PGVaultStore) UpsertDocument(ctx context.Context, doc *store.VaultDocument) error {
-	tid := mustParseUUID(doc.TenantID)
-	aid := optAgentUUID(doc.AgentID)
+	tid, err := parseUUID(doc.TenantID)
+	if err != nil {
+		return fmt.Errorf("vault upsert: tenant: %w", err)
+	}
+	aid, err := optAgentUUID(doc.AgentID)
+	if err != nil {
+		return fmt.Errorf("vault upsert: agent: %w", err)
+	}
 	now := time.Now().UTC()
 
 	meta, err := json.Marshal(doc.Metadata)
@@ -91,7 +105,10 @@ func (s *PGVaultStore) UpsertDocument(ctx context.Context, doc *store.VaultDocum
 
 	var teamID *uuid.UUID
 	if doc.TeamID != nil && *doc.TeamID != "" {
-		t := mustParseUUID(*doc.TeamID)
+		t, err := parseUUID(*doc.TeamID)
+		if err != nil {
+			return fmt.Errorf("vault upsert: team: %w", err)
+		}
 		teamID = &t
 	}
 
@@ -358,8 +375,14 @@ func (s *PGVaultStore) UpdateHash(ctx context.Context, tenantID, id, newHash str
 
 // Search performs hybrid FTS + vector search on vault_documents.
 func (s *PGVaultStore) Search(ctx context.Context, opts store.VaultSearchOptions) ([]store.VaultSearchResult, error) {
-	tid := mustParseUUID(opts.TenantID)
-	aid := optAgentUUID(&opts.AgentID) // empty string → nil → no agent filter
+	tid, err := parseUUID(opts.TenantID)
+	if err != nil {
+		return nil, fmt.Errorf("vault search: tenant: %w", err)
+	}
+	aid, err := optAgentUUID(&opts.AgentID) // empty string → nil → no agent filter
+	if err != nil {
+		return nil, fmt.Errorf("vault search: agent: %w", err)
+	}
 
 	// Build team filter for search sub-queries.
 	tf := buildSearchTeamFilter(opts.TeamID, opts.TeamIDs)
