@@ -10,7 +10,17 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
+
+// dispatchWaitTimeout bounds how long a webhook dispatch test will block on
+// the onMessage channel before failing. Kept short (2s) so a regression in
+// the dispatch path cannot hang CI for the full go test default (10 min).
+// Do NOT replace with t.Context().Done() — that context is only canceled
+// after the test returns, which creates a deadlock if the channel never
+// receives. This bit Wave C when an unrelated HMAC patch suppressed
+// dispatch and the test ran for 10 minutes before timing out.
+const dispatchWaitTimeout = 2 * time.Second
 
 // --- helpers ---
 
@@ -164,7 +174,7 @@ func TestWebhookHandler_TokenMatch_Dispatches(t *testing.T) {
 		if e == nil {
 			t.Error("dispatched event was nil")
 		}
-	case <-t.Context().Done():
+	case <-time.After(dispatchWaitTimeout):
 		t.Error("timeout waiting for dispatched event")
 	}
 }
@@ -257,7 +267,7 @@ func TestWebhookHandler_EncryptedEvent_Decrypted(t *testing.T) {
 		if e == nil {
 			t.Error("dispatched event was nil")
 		}
-	case <-t.Context().Done():
+	case <-time.After(dispatchWaitTimeout):
 		t.Error("timeout waiting for dispatched encrypted event")
 	}
 }
