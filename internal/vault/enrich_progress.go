@@ -50,13 +50,15 @@ func (p *EnrichProgress) broadcast(e EnrichEvent) {
 }
 
 // Start signals enrichment with updated total and tenant scope.
+// Resets done counter so the progress bar starts from 0%.
 func (p *EnrichProgress) Start(total int, tenantID uuid.UUID) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	p.done = 0
 	p.total = total
 	p.tenantID = tenantID
 	p.running = true
-	p.broadcast(EnrichEvent{Phase: "enriching", Done: p.done, Total: p.total, Running: true})
+	p.broadcast(EnrichEvent{Phase: "enriching", Done: 0, Total: p.total, Running: true})
 }
 
 // AddDone increments completed count by n and broadcasts progress.
