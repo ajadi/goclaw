@@ -757,6 +757,85 @@ Tenant-scoped writes use the symmetric `requireTenantAdmin(w, r, tenantStore)` i
 
 ---
 
+## 14. Per-Tenant Tool Configuration (4-Tier Overlay)
+
+Tenant admins can override tool config without affecting other tenants or master. Overlay priority (most specific wins):
+
+```
+Tool call Execute(ctx, params)
+  ↓
+BuiltinToolSettingsFromCtx(ctx) returns merged map:
+  1. Per-agent override   (agents.builtin_tool_settings; reserved for future)
+  2. Tenant override      (builtin_tool_tenant_configs.settings column)
+  3. Global default       (builtin_tools.settings column, resolver-loaded)
+  4. Hardcoded fallback   (tool internal default when no entry exists)
+```
+
+Each tool that needs tenant-aware config calls `BuiltinToolSettingsFromCtx(ctx)` and unmarshals its settings key. Merge happens at tool-name level: tenant entry for `web_search` wins wholesale over global, no deep field-level merge.
+
+**Opt-in pattern** — Any tool can participate by:
+```go
+func (t *MyTool) Execute(ctx context.Context, params MyParams) (*Result, error) {
+    settings := tools.BuiltinToolSettingsFromCtx(ctx)
+    var cfg MyToolConfig = t.defaults
+    if raw, ok := settings["my_tool"]; ok {
+        if err := json.Unmarshal(raw, &cfg); err != nil {
+            slog.Warn("my_tool: invalid tenant settings, using defaults", "error", err)
+        }
+    }
+    return t.doWork(ctx, cfg, params)
+}
+```
+
+### Schema Contracts
+
+#### web_search (tenant override shape)
+```json
+{
+  "provider_order": ["exa", "tavily", "brave", "duckduckgo"],
+  "exa": { "enabled": true, "max_results": 10 },
+  "tavily": { "enabled": true, "max_results": 5 },
+  "brave": { "enabled": true, "max_results": 5 },
+  "duckduckgo": { "enabled": true, "max_results": 10 }
+}
+```
+
+#### web_fetch (tenant override shape)
+```json
+{
+  "policy": "allow_all",
+  "allowed_domains": ["github.com", "*.example.com"],
+  "blocked_domains": ["malicious.com"]
+}
+```
+
+#### tts (tenant override shape)
+```json
+{
+  "primary": "elevenlabs"
+}
+```
+
+**Secret vs non-secret split:**
+- Non-secret (provider priorities, max_results, allowed_domains): `builtin_tool_tenant_configs.settings` (editable via UI)
+- Secret (API keys): `config_secrets` table (encrypted, tenant-scoped)
+
+Never put credentials in tool settings JSON — backend does not validate.
+
+### Tenant Admin Workflow
+
+1. Log in as tenant admin → Settings → Builtin Tools
+2. Click gear icon next to a tool → JSON editor opens
+3. Edit settings per schema contracts above → Save
+4. Changes take effect immediately on next agent turn (cache invalidated via pub/sub)
+5. Click "Reset to default" to revert to platform defaults
+
+### Feature Flag: Tenant-Scoped Singleton Pools
+
+`config.Tools.TenantScopedSingletons` (default: false) gates Phase 8 refactor — per-tenant connection pool instances for stateful tools (TTS manager, web_fetch policy validator). Disable for legacy singleton behavior. Enable after 1-week staging smoke test.
+
+---
+
 ## File Reference
 
 ### Core Infrastructure
