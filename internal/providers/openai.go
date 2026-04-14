@@ -20,15 +20,16 @@ import (
 // OpenAIProvider implements Provider for OpenAI-compatible APIs
 // (OpenAI, Groq, OpenRouter, DeepSeek, VLLM, etc.)
 type OpenAIProvider struct {
-	name         string
-	apiKey       string
-	apiBase      string
-	chatPath     string // defaults to "/chat/completions"
-	authPrefix   string // auth header prefix, defaults to "Bearer " if empty
-	defaultModel string
-	providerType string // DB provider_type (e.g. "gemini_native", "openai", "minimax_native")
-	client       *http.Client
-	retryConfig  RetryConfig
+	name           string
+	apiKey         string
+	apiBase        string
+	chatPath       string // defaults to "/chat/completions"
+	authPrefix     string // auth header prefix, defaults to "Bearer " if empty
+	defaultModel   string
+	providerType   string // DB provider_type (e.g. "gemini_native", "openai", "minimax_native")
+	client         *http.Client
+	retryConfig    RetryConfig
+	skipAuthHeader bool // when true, doRequest() omits Authorization (transport injects auth)
 }
 
 // isOpenAINativeEndpoint returns true for endpoints confirmed to be native OpenAI
@@ -111,6 +112,26 @@ func (p *OpenAIProvider) WithChatPath(path string) *OpenAIProvider {
 // Default is "Bearer " if not set.
 func (p *OpenAIProvider) WithAuthPrefix(prefix string) *OpenAIProvider {
 	p.authPrefix = prefix
+	return p
+}
+
+// WithHTTPClient replaces the default HTTP client. Intended for providers that
+// need a custom transport (e.g. oauth2.Transport for Vertex AI auto-refresh).
+// Pair with WithoutAuthHeader() so the static Authorization header is omitted
+// and the transport's auth injection is not overwritten or duplicated.
+func (p *OpenAIProvider) WithHTTPClient(client *http.Client) *OpenAIProvider {
+	if client != nil {
+		p.client = client
+	}
+	return p
+}
+
+// WithoutAuthHeader disables the default Authorization header injection.
+// Caller must inject auth via the HTTP client's Transport (e.g. oauth2.Transport
+// for Vertex AI service-account auth). Used for providers whose auth tokens
+// expire and must be refreshed — static apiKey is not usable.
+func (p *OpenAIProvider) WithoutAuthHeader() *OpenAIProvider {
+	p.skipAuthHeader = true
 	return p
 }
 
@@ -340,9 +361,17 @@ func (p *OpenAIProvider) buildRequestBody(model string, req ChatRequest, stream 
 
 	// Compute provider capability once: does this endpoint support Google's thought_signature?
 	// We check providerType, name, apiBase, and the model string (robust detection for proxies/OpenRouter).
-	supportsThoughtSignature := strings.Contains(strings.ToLower(p.providerType), "gemini") ||
+	// Vertex AI is included explicitly — its endpoint only serves Gemini-family models via the OpenAI-compat
+	// path (Claude on Vertex uses Anthropic's native format, not this endpoint), so matching by providerType
+	// or apiBase "aiplatform" is safe. Required to avoid HTTP 400 on tool-call rounds when the model name
+	// doesn't happen to contain "gemini" (e.g., fine-tuned endpoint IDs).
+	lowerProviderType := strings.ToLower(p.providerType)
+	lowerAPIBase := strings.ToLower(p.apiBase)
+	supportsThoughtSignature := strings.Contains(lowerProviderType, "gemini") ||
+		strings.Contains(lowerProviderType, "vertex") ||
 		strings.Contains(strings.ToLower(p.name), "gemini") ||
-		strings.Contains(strings.ToLower(p.apiBase), "generativelanguage") ||
+		strings.Contains(lowerAPIBase, "generativelanguage") ||
+		strings.Contains(lowerAPIBase, "aiplatform") ||
 		strings.Contains(strings.ToLower(model), "gemini")
 
 	if supportsThoughtSignature {
@@ -566,10 +595,15 @@ func (p *OpenAIProvider) doRequest(ctx context.Context, body any) (io.ReadCloser
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
-	// Azure OpenAI/Foundry support for now atleast
-	if strings.Contains(strings.ToLower(p.apiBase), "azure.com") {
+	switch {
+	case p.skipAuthHeader:
+		// Auth is injected by the HTTP client's Transport (e.g. oauth2.Transport
+		// for Vertex AI). Setting Authorization here would be overwritten anyway,
+		// so skip to avoid leaking a stale apiKey on the wire.
+	case strings.Contains(strings.ToLower(p.apiBase), "azure.com"):
+		// Azure OpenAI/Foundry uses api-key header instead of Authorization.
 		httpReq.Header.Set("api-key", p.apiKey)
-	} else {
+	default:
 		prefix := p.authPrefix
 		if prefix == "" {
 			prefix = "Bearer "
