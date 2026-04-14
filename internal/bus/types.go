@@ -13,6 +13,7 @@ import (
 type MediaFile struct {
 	Path     string `json:"path"`
 	MimeType string `json:"mime_type,omitempty"` // e.g. "application/pdf", "image/jpeg"
+	Filename string `json:"filename,omitempty"`  // original user-provided filename, e.g. "Báo cáo Q4.pdf"; empty → UUID fallback in persistMedia
 }
 
 // InboundMessage represents a message received from a channel (Telegram, Discord, etc.)
@@ -142,10 +143,16 @@ type AuditEventPayload struct {
 }
 
 // CacheInvalidatePayload signals cache layers to evict stale entries.
-// Used with protocol.EventCacheInvalidate events.
+// Used with protocol.EventCacheInvalidate events. Events are delivered
+// in-process via MessageBus and never marshaled to the wire, so the json
+// tags are documentation-only (and omitempty on uuid.UUID is a no-op
+// because uuid.UUID is [16]byte — all-zero arrays don't count as empty).
 type CacheInvalidatePayload struct {
 	Kind string `json:"kind"` // CacheKind* constants
 	Key  string `json:"key"`  // agent_key, agent_id, etc. Empty = invalidate all
+	// TenantID scopes the invalidation to a single tenant. uuid.Nil means
+	// global (master admin action) — subscribers treat it as "invalidate all".
+	TenantID uuid.UUID `json:"tenant_id"`
 }
 
 // MessageHandler handles an inbound message from a specific channel.

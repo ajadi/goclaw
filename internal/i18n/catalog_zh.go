@@ -31,6 +31,14 @@ func init() {
 		MsgUserIDRequired:    "user_id 是必填项",
 		MsgMsgRequired:       "消息是必填项",
 
+		// Abort
+		MsgAbortStopped:         "已停止运行",
+		MsgAbortForced:          "已强制中止运行（超过 3 秒宽限期）",
+		MsgAbortAlreadyAborting: "正在中止中",
+		MsgAbortNotFound:        "运行未找到或已结束",
+		MsgAbortUnauthorized:    "无权中止此运行",
+		MsgAbortFailed:          "无法中止运行：%s",
+
 		// Channel instances
 		MsgInvalidChannelType: "Channel类型无效",
 		MsgInstanceNotFound:   "未找到实例",
@@ -105,8 +113,10 @@ func init() {
 		MsgInvalidLogAction: "action 必须是 'start' 或 'stop'",
 
 		// Config
-		MsgRawConfigRequired: "raw 配置是必填项",
-		MsgRawPatchRequired:  "raw 补丁是必填项",
+		MsgRawConfigRequired:     "raw 配置是必填项",
+		MsgRawPatchRequired:      "raw 补丁是必填项",
+		MsgConfigMasterScopeOnly: "config.* 方法仅适用于主作用域；使用租户工具配置端点进行租户级覆盖",
+		MsgMasterScopeRequired:   "此操作需要主租户范围",
 
 		// Storage / File
 		MsgCannotDeleteSkillsDir: "无法删除Skill目录",

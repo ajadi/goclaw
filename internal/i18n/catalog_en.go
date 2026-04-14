@@ -31,6 +31,14 @@ func init() {
 		MsgUserIDRequired:    "user_id is required",
 		MsgMsgRequired:       "message is required",
 
+		// Abort
+		MsgAbortStopped:         "run stopped",
+		MsgAbortForced:          "run force-aborted (3s grace exceeded)",
+		MsgAbortAlreadyAborting: "abort already in progress",
+		MsgAbortNotFound:        "run not found or already finished",
+		MsgAbortUnauthorized:    "not authorized to abort this run",
+		MsgAbortFailed:          "failed to abort run: %s",
+
 		// Channel instances
 		MsgInvalidChannelType: "invalid channel_type",
 		MsgInstanceNotFound:   "instance not found",
@@ -105,8 +113,10 @@ func init() {
 		MsgInvalidLogAction: "action must be 'start' or 'stop'",
 
 		// Config
-		MsgRawConfigRequired: "raw config is required",
-		MsgRawPatchRequired:  "raw patch is required",
+		MsgRawConfigRequired:     "raw config is required",
+		MsgRawPatchRequired:      "raw patch is required",
+		MsgConfigMasterScopeOnly: "config.* methods are master-scope only; use tenant tool config endpoints for per-tenant overrides",
+		MsgMasterScopeRequired:   "this action requires master tenant scope",
 
 		// Storage / File
 		MsgCannotDeleteSkillsDir: "cannot delete skills directories",

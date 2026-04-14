@@ -520,6 +520,178 @@ Multi-tenant management (admin only).
 
 ---
 
+## 19. V3 Methods (Evolution, Episodic, Vault, Orchestration)
+
+### Evolution Metrics
+
+| Method | Description |
+|--------|-------------|
+| `agent.evolution.metrics` | Get aggregated or raw metrics for agent |
+| `agent.evolution.suggestions` | List evolution suggestions with filtering |
+| `agent.evolution.apply` | Apply an approved suggestion (auto-adapt) |
+| `agent.evolution.rollback` | Rollback a previously applied suggestion |
+
+**`agent.evolution.metrics` request:**
+
+```json
+{
+  "agentId": "uuid",
+  "type": "tool|retrieval|feedback",
+  "aggregate": true,
+  "since": "2026-03-30T00:00:00Z"
+}
+```
+
+**Response:** Same as HTTP `GET /v1/agents/{agentID}/evolution/metrics`.
+
+**`agent.evolution.suggestions` request:**
+
+```json
+{
+  "agentId": "uuid",
+  "status": "pending|approved|applied|rejected|rolled_back",
+  "limit": 50
+}
+```
+
+**`agent.evolution.apply` request:**
+
+```json
+{
+  "agentId": "uuid",
+  "suggestionId": "uuid"
+}
+```
+
+### Episodic Memory
+
+| Method | Description |
+|--------|-------------|
+| `agent.episodic.list` | List episodic summaries for agent |
+| `agent.episodic.search` | Hybrid search episodic summaries |
+
+**`agent.episodic.list` request:**
+
+```json
+{
+  "agentId": "uuid",
+  "userId": "optional-user-id",
+  "limit": 20,
+  "offset": 0
+}
+```
+
+**`agent.episodic.search` request:**
+
+```json
+{
+  "agentId": "uuid",
+  "query": "search terms",
+  "userId": "optional",
+  "maxResults": 10,
+  "minScore": 0.5
+}
+```
+
+### Knowledge Vault
+
+| Method | Description |
+|--------|-------------|
+| `agent.vault.documents` | List vault documents for agent |
+| `agent.vault.get` | Get single vault document |
+| `agent.vault.search` | Hybrid search vault documents |
+| `agent.vault.links` | Get outgoing + backlinks for document |
+
+**`agent.vault.documents` request:**
+
+```json
+{
+  "agentId": "uuid",
+  "scope": "team|user|global",
+  "docTypes": ["guide", "reference"],
+  "limit": 20,
+  "offset": 0
+}
+```
+
+**`agent.vault.search` request:**
+
+```json
+{
+  "agentId": "uuid",
+  "query": "search terms",
+  "scope": "team",
+  "docTypes": ["guide"],
+  "maxResults": 10
+}
+```
+
+### Orchestration
+
+| Method | Description |
+|--------|-------------|
+| `agent.orchestration.mode` | Get agent's orchestration mode + delegation targets |
+
+**`agent.orchestration.mode` request:**
+
+```json
+{
+  "agentId": "uuid"
+}
+```
+
+**Response:**
+
+```json
+{
+  "mode": "standalone|delegate|team",
+  "delegateTargets": [
+    {"agentKey": "research-agent", "displayName": "Research Specialist"}
+  ],
+  "team": null
+}
+```
+
+### V3 Feature Flags
+
+| Method | Description |
+|--------|-------------|
+| `agent.v3flags.get` | Get v3 feature flags for agent |
+| `agent.v3flags.update` | Update v3 feature flags |
+
+**`agent.v3flags.get` request:**
+
+```json
+{
+  "agentId": "uuid"
+}
+```
+
+**Response:**
+
+```json
+{
+  "evolutionEnabled": true,
+  "episodicEnabled": true,
+  "vaultEnabled": true,
+  "orchestrationEnabled": false
+}
+```
+
+**`agent.v3flags.update` request:**
+
+```json
+{
+  "agentId": "uuid",
+  "flags": {
+    "evolutionEnabled": true,
+    "episodicEnabled": false
+  }
+}
+```
+
+---
+
 ## 20. Permission Matrix
 
 Methods are gated by role. The role is determined at `connect` time from the token type and scopes.
@@ -555,11 +727,44 @@ The server pushes events to connected clients via event frames. Key event types:
 | `chunk` | Streaming text chunk |
 | `tool.call` | Tool invocation started |
 | `tool.result` | Tool invocation completed |
+| `trace.status` | Trace status changed (cancelled, completed, error) |
 | `session.updated` | Session metadata changed |
 | `agent.updated` | Agent config changed |
 | `cron.fired` | Cron job triggered |
 | `team.task.*` | Team task lifecycle events |
 | `exec.approval.pending` | Command awaiting approval |
+
+### V3 Events
+
+| Event | Description | Payload |
+|-------|-------------|---------|
+| `trace.status` | Trace status changed (real-time stop/abort visibility) | `{traceId, status, endedAt?}` |
+| `evolution.metrics.updated` | New evolution metrics recorded | `{agentId, metricType, toolName, value}` |
+| `evolution.suggestion` | New evolution suggestion generated | `{agentId, suggestionId, type, title}` |
+| `episodic.summary` | New episodic summary created/updated | `{agentId, summaryId, userId}` |
+| `vault.document.created` | New vault document created | `{agentId, docId, title, docType}` |
+| `vault.document.updated` | Vault document updated | `{agentId, docId, title}` |
+| `orchestration.mode.changed` | Agent orchestration mode changed | `{agentId, newMode}` |
+| `v3flags.changed` | V3 feature flags updated | `{agentId, flags}` |
+
+#### `trace.status` Event
+
+Emitted whenever a trace status changes (e.g., `running` → `cancelled`, `running` → `completed`). Allows UI to update trace state in real-time without polling, particularly critical for stop/abort operations.
+
+**Payload:**
+```json
+{
+  "traceId": "uuid",
+  "status": "cancelled",
+  "endedAt": "2026-04-14T12:34:56.789Z"
+}
+```
+
+**Status values:**
+- `cancelled` — User stopped the trace via `chat.abort`
+- `completed` — Trace finished successfully
+- `error` — Trace failed with an error
+- `running` — Emitted when trace transitions from another state (rare; mostly informational)
 
 ---
 
@@ -597,5 +802,11 @@ The server pushes events to connected clients via event frames. Key event types:
 | `internal/gateway/methods/api_keys.go` | API key management |
 | `internal/gateway/methods/send.go` | Outbound messaging |
 | `internal/gateway/methods/logs.go` | Log tailing |
+| `internal/gateway/methods/agent_evolution.go` | Evolution metrics + suggestions + apply + rollback |
+| `internal/gateway/methods/agent_episodic.go` | Episodic memory list + search |
+| `internal/gateway/methods/agent_vault.go` | Knowledge vault documents + search + links |
+| `internal/gateway/methods/agent_orchestration.go` | Orchestration mode info |
+| `internal/gateway/methods/agent_v3flags.go` | V3 feature flags get/update |
 | `internal/permissions/policy.go` | RBAC policy engine |
 | `pkg/protocol/methods.go` | Method name constants |
+| `pkg/protocol/events.go` | Event type constants (incl. v3 events) |

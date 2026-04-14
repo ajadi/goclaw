@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -241,6 +242,9 @@ func (sm *SubagentManager) executeTask(ctx context.Context, task *SubagentTask) 
 				}
 				slog.Info("subagent LLM retry", "id", task.ID, "iteration", iteration, "attempt", attempt+1)
 			}
+		// ctx is the parent agent's run context — cancelling the parent (e.g. agent abort)
+		// cascades here and to all subsequent tool calls in this iteration.
+		// Do NOT replace ctx with context.Background() here; that would detach abort propagation.
 			resp, err = activeProvider.Chat(ctx, chatReq)
 			if err == nil {
 				break
@@ -301,7 +305,7 @@ func (sm *SubagentManager) executeTask(ctx context.Context, task *SubagentTask) 
 					p = strings.TrimSpace(p[:nl])
 				}
 				if p != "" {
-					mediaFiles = append(mediaFiles, bus.MediaFile{Path: p})
+					mediaFiles = append(mediaFiles, bus.MediaFile{Path: p, Filename: filepath.Base(p)})
 				}
 			}
 

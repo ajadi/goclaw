@@ -246,6 +246,8 @@ export const Events = {
 
   // Trace lifecycle
   TRACE_UPDATED: "trace.updated",
+  // Immediate status change (not flush-buffered; fired on every status write).
+  TRACE_STATUS: "trace.status",
 
   // Skill dependency check (realtime progress during startup/rescan)
   SKILL_DEPS_CHECKED: "skill.deps.checked",

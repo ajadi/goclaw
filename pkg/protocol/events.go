@@ -73,6 +73,8 @@ const (
 
 	// Trace lifecycle events (realtime trace/span updates).
 	EventTraceUpdated = "trace.updated"
+	// Immediate status change event (not flush-buffered; fired on every status write).
+	EventTraceStatusChanged = "trace.status"
 
 	// Skill dependency check events (realtime progress during startup/rescan).
 	EventSkillDepsChecked  = "skill.deps.checked"
@@ -99,8 +101,18 @@ const (
 	EventZaloPersonalQRCode = "zalo.personal.qr.code"
 	EventZaloPersonalQRDone = "zalo.personal.qr.done"
 
+	// WhatsApp QR login events (client-scoped, not broadcast).
+	EventWhatsAppQRCode = "whatsapp.qr.code"
+	EventWhatsAppQRDone = "whatsapp.qr.done"
+
 	// Tenant access revocation — forces affected user's UI to logout.
 	EventTenantAccessRevoked = "tenant.access.revoked"
+
+	// Vault enrichment pipeline progress.
+	EventVaultEnrichProgress = "vault.enrich.progress"
+
+	// Background worker alerts (non-retryable LLM errors).
+	EventBackgroundError = "background.error"
 )
 
 // Agent event subtypes (in payload.type)

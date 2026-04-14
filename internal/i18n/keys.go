@@ -32,6 +32,14 @@ const (
 	MsgUserIDRequired    = "error.user_id_required"    // "user_id is required"
 	MsgMsgRequired       = "error.message_required"    // "message is required"
 
+	// --- Abort ---
+	MsgAbortStopped         = "abort.stopped"          // "run stopped"
+	MsgAbortForced          = "abort.forced"           // "run force-aborted (3s grace exceeded)"
+	MsgAbortAlreadyAborting = "abort.already_aborting" // "abort already in progress"
+	MsgAbortNotFound        = "abort.not_found"        // "run not found or already finished"
+	MsgAbortUnauthorized    = "abort.unauthorized"     // "not authorized to abort this run"
+	MsgAbortFailed          = "abort.failed"           // "failed to abort run: %s"
+
 	// --- Channel instances ---
 	MsgInvalidChannelType = "error.invalid_channel_type" // "invalid channel_type"
 	MsgInstanceNotFound   = "error.instance_not_found"   // "instance not found"
@@ -106,8 +114,10 @@ const (
 	MsgInvalidLogAction = "error.invalid_log_action" // "action must be 'start' or 'stop'"
 
 	// --- Config ---
-	MsgRawConfigRequired = "error.raw_config_required" // "raw config is required"
-	MsgRawPatchRequired  = "error.raw_patch_required"  // "raw patch is required"
+	MsgRawConfigRequired      = "error.raw_config_required"       // "raw config is required"
+	MsgRawPatchRequired       = "error.raw_patch_required"        // "raw patch is required"
+	MsgConfigMasterScopeOnly  = "error.config_master_scope_only"  // "config.* methods are master-scope only"
+	MsgMasterScopeRequired    = "error.master_scope_required"     // "this action requires master tenant scope"
 
 	// --- Storage / File ---
 	MsgCannotDeleteSkillsDir = "error.cannot_delete_skills_dir" // "cannot delete skills directories"
