@@ -29,6 +29,16 @@
     "timeout": "超时（毫秒）",
     "title": "常规设置"
   },
+  "voice_label": "声音",
+  "voice_placeholder": "选择声音…",
+  "voice_refresh": "刷新",
+  "voice_preview": "试听",
+  "voice_stop_preview": "停止",
+  "voice_no_voices": "暂无声音",
+  "voice_loading": "加载声音中…",
+  "voice_preview_error": "试听失败 — 正在刷新",
+  "model_label": "模型",
+  "model_placeholder": "默认（租户/系统）",
   "minimax": {
     "apiBase": "API Base",
     "apiKey": "API Key",

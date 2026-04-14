@@ -60,6 +60,16 @@
     "speechRate": "Speech Rate",
     "hint": "Edge TTS is free and requires no API key. Install with: pip install edge-tts"
   },
+  "voice_label": "Voice",
+  "voice_placeholder": "Select a voice…",
+  "voice_refresh": "Refresh",
+  "voice_preview": "Preview",
+  "voice_stop_preview": "Stop",
+  "voice_no_voices": "No voices available",
+  "voice_loading": "Loading voices…",
+  "voice_preview_error": "Preview failed — refreshing list",
+  "model_label": "Model",
+  "model_placeholder": "Default (tenant/system)",
   "minimax": {
     "apiKey": "API Key",
     "groupId": "Group ID *",
