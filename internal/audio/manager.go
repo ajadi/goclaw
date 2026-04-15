@@ -6,6 +6,23 @@ import (
 	"log/slog"
 )
 
+// ctxKeyChannel is the context key for the current channel name (e.g. "telegram").
+// Set via WithChannel; read by resolveSTTChain to select channel-scoped providers.
+type ctxKeyChannelType struct{}
+
+var ctxKeyChannel = ctxKeyChannelType{}
+
+// WithChannel returns a context that carries the channel name for STT chain resolution.
+func WithChannel(ctx context.Context, channel string) context.Context {
+	return context.WithValue(ctx, ctxKeyChannel, channel)
+}
+
+// channelFromCtx extracts the channel name from ctx, or "" if not set.
+func channelFromCtx(ctx context.Context) string {
+	v, _ := ctx.Value(ctxKeyChannel).(string)
+	return v
+}
+
 // Manager orchestrates audio providers across TTS, STT, Music, and SFX
 // operations. Each op has its own provider map + primary/fallback chain.
 //
@@ -17,9 +34,10 @@ type Manager struct {
 	musicProviders map[string]MusicProvider
 	sfxProviders   map[string]SFXProvider
 
-	primary   string   // primary TTS provider
-	sttChain  []string // STT fallback order (Phase 4)
-	musicChain []string // Music fallback order (Phase 3)
+	primary             string            // primary TTS provider
+	sttChain            []string          // STT fallback order (Phase 4)
+	musicChain          []string          // Music fallback order (Phase 3)
+	channelSTTOverrides map[string][]string // channel → provider key list (Phase 4)
 
 	auto      AutoMode
 	mode      Mode
@@ -41,15 +59,16 @@ type ManagerConfig struct {
 // NewManager creates an audio manager with empty provider maps.
 func NewManager(cfg ManagerConfig) *Manager {
 	m := &Manager{
-		ttsProviders:   make(map[string]TTSProvider),
-		sttProviders:   make(map[string]STTProvider),
-		musicProviders: make(map[string]MusicProvider),
-		sfxProviders:   make(map[string]SFXProvider),
-		primary:        cfg.Primary,
-		auto:           cfg.Auto,
-		mode:           cfg.Mode,
-		maxLength:      cfg.MaxLength,
-		timeoutMs:      cfg.TimeoutMs,
+		ttsProviders:        make(map[string]TTSProvider),
+		sttProviders:        make(map[string]STTProvider),
+		musicProviders:      make(map[string]MusicProvider),
+		sfxProviders:        make(map[string]SFXProvider),
+		channelSTTOverrides: make(map[string][]string),
+		primary:             cfg.Primary,
+		auto:                cfg.Auto,
+		mode:                cfg.Mode,
+		maxLength:           cfg.MaxLength,
+		timeoutMs:           cfg.TimeoutMs,
 	}
 	if m.auto == "" {
 		m.auto = AutoOff
