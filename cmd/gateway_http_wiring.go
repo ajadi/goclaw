@@ -134,8 +134,10 @@ func (d *gatewayDeps) wireHTTPHandlersOnServer(
 	}
 
 	// Runtime package management (install/uninstall system/pip/npm/github packages)
+	// Wire the update registry AFTER initGitHubInstaller so DefaultGitHubInstaller() is set.
 	initGitHubInstaller()
-	d.server.SetPackagesHandler(httpapi.NewPackagesHandler())
+	pkgHandler := wirePackagesHandler(d)
+	d.server.SetPackagesHandler(pkgHandler)
 
 	// API documentation (OpenAPI spec + Swagger UI at /docs)
 	d.server.SetDocsHandler(httpapi.NewDocsHandler())

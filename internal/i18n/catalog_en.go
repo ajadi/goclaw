@@ -214,5 +214,15 @@ func init() {
 		MsgHookBudgetExceeded:          "tenant hook token budget exceeded",
 		MsgHookPerTurnCapReached:       "hook invocation per-turn cap reached",
 		MsgHookBuiltinReadOnly:         "builtin hooks are read-only except for the enabled toggle",
+
+		// Package updates (Phase 4+5)
+		MsgPackageNotInstalled:  "Package %s is not installed",
+		MsgPackageUpdateLocked:  "Package %s is being updated by another request",
+		MsgReleaseNotFound:      "Release %s not found for %s",
+		MsgAssetNotFound:        "No compatible asset for %s/%s",
+		MsgChecksumMismatch:     "Checksum mismatch for %s",
+		MsgUpdateSwapFailed:     "Failed to install %s; previous version restored",
+		MsgUpdateManifestDesync: "Binary updated but manifest save failed — manual recovery required for %s",
+		MsgUpdateCacheStale:     "Updates cache stale; run refresh before applying an update",
 	})
 }

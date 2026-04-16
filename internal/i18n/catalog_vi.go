@@ -214,5 +214,15 @@ func init() {
 		MsgHookBudgetExceeded:          "tenant đã vượt ngân sách token cho hook",
 		MsgHookPerTurnCapReached:       "đã đạt giới hạn số lần gọi hook trong một lượt",
 		MsgHookBuiltinReadOnly:         "hook dựng sẵn chỉ cho phép bật/tắt, không thể chỉnh sửa",
+
+		// Package updates (Phase 4+5)
+		MsgPackageNotInstalled:  "Gói %s chưa được cài đặt",
+		MsgPackageUpdateLocked:  "Gói %s đang được cập nhật bởi một yêu cầu khác",
+		MsgReleaseNotFound:      "Không tìm thấy phiên bản %s cho %s",
+		MsgAssetNotFound:        "Không có tệp tương thích cho %s/%s",
+		MsgChecksumMismatch:     "Checksum không khớp cho %s",
+		MsgUpdateSwapFailed:     "Không cài được %s; đã khôi phục phiên bản cũ",
+		MsgUpdateManifestDesync: "Binary đã cập nhật nhưng lưu manifest thất bại — cần khôi phục thủ công cho %s",
+		MsgUpdateCacheStale:     "Cache cập nhật đã cũ; hãy refresh trước khi áp dụng",
 	})
 }

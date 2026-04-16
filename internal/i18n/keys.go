@@ -113,6 +113,16 @@ const (
 	MsgSkillsUpdateNotSupported = "error.skills_update_not_supported" // "skills.update not supported for file-based skills"
 	MsgCannotResolveSkillID     = "error.cannot_resolve_skill_id"     // "cannot resolve skill ID for file-based skill"
 
+	// --- Package updates (Phase 4+5) ---
+	MsgPackageNotInstalled  = "packages.update.not_installed"    // "Package {name} is not installed"
+	MsgPackageUpdateLocked  = "packages.update.locked"           // "Package {name} is being updated by another request"
+	MsgReleaseNotFound      = "packages.update.release_not_found" // "Release {tag} not found for {repo}"
+	MsgAssetNotFound        = "packages.update.asset_not_found"  // "No compatible asset for {os}/{arch}"
+	MsgChecksumMismatch     = "packages.update.checksum_mismatch" // "Checksum mismatch for {name}"
+	MsgUpdateSwapFailed     = "packages.update.swap_failed"      // "Failed to install {name}; previous version restored"
+	MsgUpdateManifestDesync = "packages.update.manifest_desync"  // "Binary updated but manifest save failed — manual recovery required for {name}"
+	MsgUpdateCacheStale     = "packages.update.cache_stale"      // "Updates cache stale; run refresh before applying an update"
+
 	// --- Logs ---
 	MsgInvalidLogAction = "error.invalid_log_action" // "action must be 'start' or 'stop'"
 

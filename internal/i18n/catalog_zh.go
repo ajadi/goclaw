@@ -214,5 +214,15 @@ func init() {
 		MsgHookBudgetExceeded:          "租户钩子令牌预算已耗尽",
 		MsgHookPerTurnCapReached:       "单轮钩子调用次数已达上限",
 		MsgHookBuiltinReadOnly:         "内置钩子只读,仅允许切换启用状态",
+
+		// Package updates (Phase 4+5)
+		MsgPackageNotInstalled:  "软件包 %s 未安装",
+		MsgPackageUpdateLocked:  "软件包 %s 正在被其他请求更新",
+		MsgReleaseNotFound:      "%s 未找到版本 %s",
+		MsgAssetNotFound:        "没有适用于 %s/%s 的文件",
+		MsgChecksumMismatch:     "%s 校验和不匹配",
+		MsgUpdateSwapFailed:     "安装 %s 失败；已恢复旧版本",
+		MsgUpdateManifestDesync: "二进制文件已更新但清单保存失败 — %s 需要手动恢复",
+		MsgUpdateCacheStale:     "更新缓存已过期；请先刷新再应用更新",
 	})
 }
