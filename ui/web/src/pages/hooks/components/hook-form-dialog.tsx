@@ -64,7 +64,10 @@ export function HookFormDialog({ open, onOpenChange, onSubmit, initial }: HookFo
   useEffect(() => {
     if (open) {
       if (initial) {
-        const cfg = initial.config as Record<string, unknown>;
+        // Defensive: backend may emit config as null when a row was inserted
+        // without a config payload. Treat null/undefined as empty so the
+        // property reads below don't crash the edit dialog.
+        const cfg = (initial.config ?? {}) as Record<string, unknown>;
         // Legacy `command` rows coerce to `http` in the form — user cannot save as
         // `command` (enum narrowed post-Wave-1). Phase 07 auto-disables them regardless.
         const handlerType: HookFormData["handler_type"] =
