@@ -97,6 +97,11 @@ func (h *TTSHandler) handleTestConnection(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	if err := validateProviderURL(req.APIBase, req.Provider); err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":%q}`, err.Error()), http.StatusBadRequest)
+		return
+	}
+
 	// Create ephemeral provider.
 	provider, err := createEphemeralTTSProvider(req)
 	if err != nil {
