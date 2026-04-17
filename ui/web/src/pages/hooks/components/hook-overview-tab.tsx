@@ -27,10 +27,10 @@ const EVENT_COLORS: Record<string, string> = {
 
 function MetaItem({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-1">
-      <p className="text-2xs uppercase tracking-wide text-muted-foreground">{label}</p>
-      <div className="text-sm">{children}</div>
-    </div>
+    <span className="inline-flex items-center gap-1.5">
+      <span className="text-2xs uppercase tracking-wide text-muted-foreground">{label}</span>
+      <span className="text-sm">{children}</span>
+    </span>
   );
 }
 
@@ -40,9 +40,9 @@ export function HookOverviewTab({ hook }: HookOverviewTabProps) {
   const scriptSource = hook.handler_type === "script" ? ((cfg?.source as string) ?? "") : "";
 
   return (
-    <div className="space-y-6">
-      {/* Header card — primary identity + status */}
-      <div className="rounded-lg border bg-card p-4">
+    <div className="space-y-4">
+      {/* Header card — identity + status + metadata (compact) */}
+      <div className="rounded-lg border bg-card p-4 space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <span
             className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${EVENT_COLORS[hook.event] ?? "bg-muted text-muted-foreground"}`}
@@ -69,40 +69,44 @@ export function HookOverviewTab({ hook }: HookOverviewTabProps) {
           </span>
         </div>
         {hook.matcher && (
-          <div className="mt-3 space-y-1">
+          <div className="space-y-1">
             <p className="text-2xs uppercase tracking-wide text-muted-foreground">{t("table.matcher")}</p>
             <code className="block rounded bg-muted px-2 py-1 text-xs font-mono">{hook.matcher}</code>
           </div>
         )}
         {hook.if_expr && (
-          <div className="mt-3 space-y-1">
+          <div className="space-y-1">
             <p className="text-2xs uppercase tracking-wide text-muted-foreground">{t("form.ifExpr")}</p>
             <code className="block rounded bg-muted px-2 py-1 text-xs font-mono">{hook.if_expr}</code>
           </div>
         )}
-      </div>
 
-      {/* Metadata grid */}
-      <div className="rounded-lg border bg-card p-4">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Inline metadata */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t pt-3 text-xs">
           <MetaItem label={t("form.timeout")}>
             <span className="font-mono">{hook.timeout_ms}ms</span>
           </MetaItem>
+          <span className="text-border">|</span>
           <MetaItem label={t("form.onTimeout")}>
-            <Badge variant="outline" className="capitalize">{hook.on_timeout}</Badge>
+            <Badge variant="outline" className="capitalize text-2xs py-0">{hook.on_timeout}</Badge>
           </MetaItem>
+          <span className="text-border">|</span>
           <MetaItem label={t("form.priority")}>
             <span className="font-mono">{hook.priority}</span>
           </MetaItem>
+          <span className="text-border">|</span>
           <MetaItem label="Source">
-            <Badge variant="secondary" className="capitalize">{hook.source}</Badge>
+            <Badge variant="secondary" className="capitalize text-2xs py-0">{hook.source}</Badge>
           </MetaItem>
-          <MetaItem label="Version">
-            <span className="font-mono">v{hook.version}</span>
+          <span className="text-border">|</span>
+          <MetaItem label="v">
+            <span className="font-mono">{hook.version}</span>
           </MetaItem>
+          <span className="text-border">|</span>
           <MetaItem label="Created">
             <span className="text-muted-foreground">{new Date(hook.created_at).toLocaleString()}</span>
           </MetaItem>
+          <span className="text-border">|</span>
           <MetaItem label="Updated">
             <span className="text-muted-foreground">{new Date(hook.updated_at).toLocaleString()}</span>
           </MetaItem>
