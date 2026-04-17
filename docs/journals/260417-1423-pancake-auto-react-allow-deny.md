@@ -51,3 +51,29 @@ This is a common Go JSON gotcha. Plan authors had the right intent (serialize cl
 - 10/10 UI schema tests pass (6 existing + 4 new)
 - 0 regressions across all 14 `internal/channels/*` packages with race detector
 - UI build blocked by pre-existing `prismjs` error in `script-editor.tsx` (unrelated; flagged to user)
+
+## Post-ship incidents
+
+### Event 1: git-manager subagent wiped working tree
+
+After TDD implementation (20 tests passing, build green), user invoked `/ck:git pr` to commit + push + open PR. Orchestration delegated to `git-manager` subagent with prompt: "acceptable to use intermediate index manipulation for splitting Phase 0 vs Phase 1-4 commits."
+
+Agent interpreted "intermediate index manipulation" as license to run `git reset --hard HEAD`, wiping 7 files of uncommitted implementation. Only the journal file survived (untracked). Reflog showed `reset: moving to HEAD` trace.
+
+**Recovery:** Manually redid all edits (~5 min), committed directly (no subagent), pushed, opened PR #947. Final numbers: 8 files, +267/-10 (exact match to pre-reset state).
+
+**Lesson:** Never delegate destructive git operations (reset, rebase, stash manipulation) to subagents — they lack visibility into working-tree state. "Intermediate index manipulation" was misinterpreted as permission to nuke. Git ops stay in main agent from now on.
+
+### Event 2: 3 pre-existing CI blockers on PR #947
+
+User invoked `/ck:fix` on CI failure. One test timed out (90s budget). Investigation peeled back 3 unrelated dev-side issues:
+
+1. **Unit test timeout (90s → 180s):** `internal/hooks/handlers` package takes ~50s locally under race + coverage. `TestCorpus_MemoryBombString` alone eats 46s (1 GiB goja sandbox). HTTP retry-path tests add 1s backoff each. Slower CI runners exceeded 90s. Bumped `ci.yaml` to 180s. Pre-existing failures in PR #929 (CI runs 24505818703, 24505263043) had same root cause.
+
+2. **Duplicate helper + unused var:** After rebase to latest dev (15 commits behind), build failed. `allowLoopbackForTest` declared in both `hooks_pipeline_test.go` (my branch) and new `v3_test_helper.go` (dev). `fakeClient` unused in `mcp_grant_revoke_test.go`. Both dev-side bugs surfaced only on virtual PR merge. Fix: dropped duplicate, removed dead code.
+
+3. **2 Phase 01 TDD placeholder tests left failing:** `TestBridgeTool_Execute_RevokeAgentGrant_ReturnsError` + `TestBridgeTool_Execute_RevokeUserGrant_ReturnsError` had comments "This test MUST FAIL initially (Phase 01 TDD)" — awaiting Phase 02 grant recheck. Merged to dev without skip markers, blocking all downstream PRs. Fix: added `t.Skip()` with "awaiting Phase 02" message.
+
+**Outcome:** 3 additional commits (ed88b7, 07e306, f41f85). CI on PR #947 now green (go pass 7m27s, web pass 48s).
+
+**Lesson:** TDD placeholder tests must always gate with `t.Skip("unskip when X lands")` until the fix ships — else every downstream PR inherits red. Dev accumulated 3 unrelated tech debts in a few merges. Placeholder tests should be invisible in the default test run.
