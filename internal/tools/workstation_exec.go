@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -423,11 +424,10 @@ func buildExecRequest(
 	// Base env from workstation defaults.
 	merged := make(map[string]string)
 	if len(ws.DefaultEnv) > 0 {
-		// DefaultEnv is stored as key=value lines (plaintext after decrypt).
-		for line := range strings.SplitSeq(string(ws.DefaultEnv), "\n") {
-			if k, v, ok := strings.Cut(line, "="); ok {
-				merged[strings.TrimSpace(k)] = v
-			}
+		// DefaultEnv is stored as a JSON map of env overrides (plaintext after decrypt).
+		var defaults map[string]string
+		if err := json.Unmarshal(ws.DefaultEnv, &defaults); err == nil {
+			maps.Copy(merged, defaults)
 		}
 	}
 	// Call-time env overrides defaults.

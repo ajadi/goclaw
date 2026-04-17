@@ -260,6 +260,7 @@ func (s *PGWorkstationStore) scanRows(rows *sql.Rows) ([]store.Workstation, erro
 			&meta, &ws.DefaultCWD, &env,
 			&ws.Active, &ws.CreatedAt, &ws.UpdatedAt, &ws.CreatedBy,
 		); err != nil {
+			slog.Error("workstation.scan_error", "err", err)
 			continue
 		}
 		ws.Metadata = s.decryptField(meta, "metadata")

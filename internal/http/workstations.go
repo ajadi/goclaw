@@ -288,6 +288,18 @@ func (h *WorkstationsHandler) handlePermList(w http.ResponseWriter, r *http.Requ
 			i18n.T(locale, i18n.MsgInvalidID, "workstation"))
 		return
 	}
+	// Ownership check: verify workstation belongs to caller's tenant before listing perms.
+	// GetByID scopes the query by tenant_id — returns ErrNoRows for a different tenant.
+	if _, err := h.wsStore.GetByID(ctx, wsID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeError(w, http.StatusNotFound, protocol.ErrNotFound,
+				i18n.T(locale, i18n.MsgWorkstationNotFound, wsID.String()))
+			return
+		}
+		writeError(w, http.StatusInternalServerError, protocol.ErrInternal,
+			i18n.T(locale, i18n.MsgInternalError, err.Error()))
+		return
+	}
 	perms, err := h.permStore.ListForWorkstation(ctx, wsID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, protocol.ErrInternal,

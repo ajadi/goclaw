@@ -89,3 +89,10 @@ func (b *SSHBackend) OpenSession(ctx context.Context, sessionID string) (worksta
 // CloseSession is a no-op at the backend level; session cleanup is done by SSHSession.Close.
 // The session manager (Phase 4) tracks open sessions and calls session.Close directly.
 func (b *SSHBackend) CloseSession(_ context.Context, _ string) error { return nil }
+
+// Close shuts down the client pool, terminating all idle SSH connections and the
+// prune goroutine. Must be called when the backend is evicted from BackendCache.
+func (b *SSHBackend) Close() error {
+	b.pool.Close()
+	return nil
+}

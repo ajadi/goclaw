@@ -371,6 +371,18 @@ func (m *WorkstationsMethods) handlePermList(ctx context.Context, client *gatewa
 			i18n.T(locale, i18n.MsgInvalidID, "workstation")))
 		return
 	}
+	// Ownership check: verify workstation belongs to caller's tenant before listing perms.
+	// GetByID scopes the query by tenant_id — returns ErrNoRows for a different tenant.
+	if _, err := m.wsStore.GetByID(ctx, wsID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			client.SendResponse(protocol.NewErrorResponse(req.ID, protocol.ErrNotFound,
+				i18n.T(locale, i18n.MsgWorkstationNotFound, params.WorkstationID)))
+			return
+		}
+		client.SendResponse(protocol.NewErrorResponse(req.ID, protocol.ErrInternal,
+			i18n.T(locale, i18n.MsgInternalError, err.Error())))
+		return
+	}
 	perms, err := m.permStore.ListForWorkstation(ctx, wsID)
 	if err != nil {
 		client.SendResponse(protocol.NewErrorResponse(req.ID, protocol.ErrInternal,

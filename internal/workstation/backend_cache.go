@@ -69,6 +69,8 @@ func (c *BackendCache) Get(ctx context.Context, wsID uuid.UUID) (Backend, error)
 	defer c.mu.Unlock()
 	// Double-check: another goroutine may have populated the entry while we held no lock.
 	if cb, ok := c.cache[wsID]; ok && time.Since(cb.lastUsed) < c.ttl {
+		// Lost the race — close our backend to stop its background goroutine.
+		_ = b.Close()
 		return cb.backend, nil
 	}
 	c.cache[wsID] = &cachedBackend{backend: b, lastUsed: time.Now()}

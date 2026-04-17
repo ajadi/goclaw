@@ -47,7 +47,7 @@ type Workstation struct {
 	// json:"-" prevents SSH keys/passwords from appearing in API responses.
 	Metadata   []byte    `json:"-"`
 	DefaultCWD string    `json:"defaultCwd"`
-	// DefaultEnv holds key=value env overrides. Plaintext after decrypt.
+	// DefaultEnv holds a JSON map of env overrides. Plaintext after decrypt.
 	// json:"-" prevents env secrets from appearing in API responses.
 	DefaultEnv []byte    `json:"-"`
 	Active     bool      `json:"active"`

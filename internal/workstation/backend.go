@@ -23,6 +23,8 @@ type Backend interface {
 	OpenSession(ctx context.Context, sessionID string) (Session, error)
 	// CloseSession terminates an open session by ID.
 	CloseSession(ctx context.Context, sessionID string) error
+	// Close shuts down the backend and releases all resources (connections, goroutines).
+	Close() error
 }
 
 // ExecRequest describes a command to run in a Session.
