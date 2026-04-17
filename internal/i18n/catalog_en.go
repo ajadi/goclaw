@@ -75,6 +75,9 @@ func init() {
 		MsgNoDescription:         "agent has no description to resummon from",
 		MsgInvalidPath:           "invalid path",
 
+		// Tenant backup / restore
+		MsgRestoreNewModeRejectsTenantID: "mode=new creates a fresh tenant; pass tenant_slug (not tenant_id) as the new tenant's target slug",
+
 		// Scheduler
 		MsgQueueFull:    "session queue is full",
 		MsgShuttingDown: "gateway is shutting down, please retry shortly",

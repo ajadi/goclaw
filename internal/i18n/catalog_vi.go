@@ -75,6 +75,9 @@ func init() {
 		MsgNoDescription:         "agent không có mô tả để triệu hồi lại",
 		MsgInvalidPath:           "đường dẫn không hợp lệ",
 
+		// Tenant backup / restore
+		MsgRestoreNewModeRejectsTenantID: "mode=new tạo tenant mới; dùng tenant_slug (không phải tenant_id) làm slug cho tenant mới",
+
 		// Scheduler
 		MsgQueueFull:    "hàng đợi session đã đầy",
 		MsgShuttingDown: "cổng đang tắt, vui lòng thử lại sau",

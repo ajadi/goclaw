@@ -76,6 +76,9 @@ const (
 	MsgNoDescription        = "error.no_description"            // "agent has no description to resummon from"
 	MsgInvalidPath          = "error.invalid_path"              // "invalid path"
 
+	// --- Tenant backup / restore ---
+	MsgRestoreNewModeRejectsTenantID = "error.restore_new_mode_rejects_tenant_id" // "mode=new uses tenant_slug; tenant_id is not accepted"
+
 	// --- Scheduler ---
 	MsgQueueFull       = "error.queue_full"       // "session queue is full"
 	MsgShuttingDown    = "error.shutting_down"     // "gateway is shutting down, please retry shortly"

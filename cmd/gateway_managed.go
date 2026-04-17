@@ -127,8 +127,10 @@ func wireExtras(
 
 	// 5. Shared MCP connection pool (eliminates duplicate connections across agents)
 	var mcpPool *mcpbridge.Pool
+	var mcpGrantChecker mcpbridge.GrantChecker
 	if stores.MCP != nil {
 		mcpPool = mcpbridge.NewPool(mcpbridge.DefaultPoolConfig())
+		mcpGrantChecker = mcpbridge.NewStoreGrantChecker(stores.MCP, msgBus)
 	}
 
 	// 6. Set up agent resolver: lazy-creates Loops from DB
@@ -221,6 +223,7 @@ func wireExtras(
 		BuiltinToolStore:       stores.BuiltinTools,
 		MCPStore:               stores.MCP,
 		MCPPool:                mcpPool,
+		MCPGrantChecker:        mcpGrantChecker,
 		ConfigPermStore:        stores.ConfigPermissions,
 		MediaStore:             mediaStore,
 		ModelPricing:           appCfg.Telemetry.ModelPricing,
@@ -232,6 +235,7 @@ func wireExtras(
 		SkillTenantCfgs:        stores.SkillTenantCfgs,
 		SystemConfigs:          stores.SystemConfigs,
 		Workspace:              workspace,
+		TTSAutoMode:            appCfg.Tts.Auto,
 		AutoInjector:           autoInjector,
 		EvolutionMetricsStore:  stores.EvolutionMetrics,
 		DomainBus:              domainBus,

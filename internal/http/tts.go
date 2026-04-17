@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/nextlevelbuilder/goclaw/internal/audio"
@@ -20,8 +21,11 @@ import (
 // TTSHandler handles POST /v1/tts/synthesize — converts text to audio via a
 // configured TTS provider and returns raw audio bytes with the appropriate MIME type.
 type TTSHandler struct {
-	manager     *audio.Manager
-	rateLimiter func(string) bool // per-IP/token rate limit check (nil = no limit)
+	mu            sync.RWMutex
+	manager       *audio.Manager
+	rateLimiter   func(string) bool         // per-IP/token rate limit check (nil = no limit)
+	systemConfigs store.SystemConfigStore   // per-tenant TTS settings
+	configSecrets store.ConfigSecretsStore  // per-tenant TTS secrets
 }
 
 // NewTTSHandler creates a TTSHandler backed by the given audio.Manager.
@@ -32,10 +36,28 @@ func NewTTSHandler(mgr *audio.Manager) *TTSHandler {
 // SetRateLimiter injects the rate limiter function (reused from the server's global limiter).
 func (h *TTSHandler) SetRateLimiter(fn func(string) bool) { h.rateLimiter = fn }
 
-// RegisterRoutes wires POST /v1/tts/synthesize onto mux with RoleOperator auth.
+// SetStores injects stores for per-tenant TTS config lookup.
+func (h *TTSHandler) SetStores(sc store.SystemConfigStore, cs store.ConfigSecretsStore) {
+	h.systemConfigs = sc
+	h.configSecrets = cs
+}
+
+// UpdateManager swaps the underlying manager (hot-reload safe).
+func (h *TTSHandler) UpdateManager(mgr *audio.Manager) {
+	if mgr == nil {
+		return
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.manager = mgr
+}
+
+// RegisterRoutes wires TTS endpoints onto mux with RoleOperator auth.
 func (h *TTSHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /v1/tts/synthesize",
 		requireAuth(permissions.RoleOperator, h.handleSynthesize))
+	mux.HandleFunc("POST /v1/tts/test-connection",
+		requireAuth(permissions.RoleOperator, h.handleTestConnection))
 }
 
 // synthesizeRequest is the JSON body for POST /v1/tts/synthesize.
@@ -89,19 +111,28 @@ func (h *TTSHandler) handleSynthesize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Resolve provider — explicit name or fall back to manager's primary.
-	name := req.Provider
-	if name == "" {
-		name = h.manager.PrimaryProvider()
-	}
-	if name == "" {
-		http.Error(w, `{"error":"no tts provider configured"}`, http.StatusNotFound)
-		return
-	}
-	p, ok := h.manager.GetProvider(name)
-	if !ok {
-		http.Error(w, fmt.Sprintf(`{"error":%q}`, "provider not found: "+name), http.StatusNotFound)
-		return
+	// Try per-tenant TTS config first, fall back to global manager.
+	p, name, err := h.resolveTenantProvider(ctx, req.Provider)
+	if err != nil {
+		// Tenant config lookup failed, try global manager
+		h.mu.RLock()
+		mgr := h.manager
+		h.mu.RUnlock()
+
+		name = req.Provider
+		if name == "" {
+			name = mgr.PrimaryProvider()
+		}
+		if name == "" {
+			http.Error(w, `{"error":"no tts provider configured"}`, http.StatusNotFound)
+			return
+		}
+		var ok bool
+		p, ok = mgr.GetProvider(name)
+		if !ok {
+			http.Error(w, fmt.Sprintf(`{"error":%q}`, "provider not found: "+name), http.StatusNotFound)
+			return
+		}
 	}
 
 	// ElevenLabs model validation — rejects unknown model IDs with allowlist error.
@@ -137,4 +168,72 @@ func (h *TTSHandler) handleSynthesize(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(result.Audio)))
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(result.Audio)
+}
+
+// resolveTenantProvider attempts to create a TTS provider from tenant-specific config.
+// Returns (nil, "", error) if tenant has no TTS config — caller should fall back to global manager.
+func (h *TTSHandler) resolveTenantProvider(ctx context.Context, explicitProvider string) (audio.TTSProvider, string, error) {
+	if h.systemConfigs == nil || h.configSecrets == nil {
+		return nil, "", fmt.Errorf("stores not configured")
+	}
+
+	// Get tenant's configured provider
+	providerName := explicitProvider
+	if providerName == "" {
+		var err error
+		providerName, err = h.systemConfigs.Get(ctx, "tts.provider")
+		if err != nil || providerName == "" {
+			return nil, "", fmt.Errorf("no tenant tts provider")
+		}
+	}
+
+	// Build ephemeral provider from tenant config
+	req := testConnectionRequest{Provider: providerName}
+
+	switch providerName {
+	case "openai":
+		if key, _ := h.configSecrets.Get(ctx, "tts.openai.api_key"); key != "" {
+			req.APIKey = key
+		} else {
+			return nil, "", fmt.Errorf("no api key")
+		}
+		req.APIBase, _ = h.systemConfigs.Get(ctx, "tts.openai.api_base")
+		req.VoiceID, _ = h.systemConfigs.Get(ctx, "tts.openai.voice")
+		req.ModelID, _ = h.systemConfigs.Get(ctx, "tts.openai.model")
+
+	case "elevenlabs":
+		if key, _ := h.configSecrets.Get(ctx, "tts.elevenlabs.api_key"); key != "" {
+			req.APIKey = key
+		} else {
+			return nil, "", fmt.Errorf("no api key")
+		}
+		req.APIBase, _ = h.systemConfigs.Get(ctx, "tts.elevenlabs.api_base")
+		req.VoiceID, _ = h.systemConfigs.Get(ctx, "tts.elevenlabs.voice")
+		req.ModelID, _ = h.systemConfigs.Get(ctx, "tts.elevenlabs.model")
+
+	case "minimax":
+		if key, _ := h.configSecrets.Get(ctx, "tts.minimax.api_key"); key != "" {
+			req.APIKey = key
+		} else {
+			return nil, "", fmt.Errorf("no api key")
+		}
+		req.GroupID, _ = h.configSecrets.Get(ctx, "tts.minimax.group_id")
+		req.APIBase, _ = h.systemConfigs.Get(ctx, "tts.minimax.api_base")
+		req.VoiceID, _ = h.systemConfigs.Get(ctx, "tts.minimax.voice")
+		req.ModelID, _ = h.systemConfigs.Get(ctx, "tts.minimax.model")
+
+	case "edge":
+		req.VoiceID, _ = h.systemConfigs.Get(ctx, "tts.edge.voice")
+
+	default:
+		return nil, "", fmt.Errorf("unsupported provider: %s", providerName)
+	}
+
+	provider, err := createEphemeralTTSProvider(req)
+	if err != nil {
+		return nil, "", err
+	}
+
+	slog.Debug("tts: using tenant provider", "provider", providerName, "tenant", store.TenantIDFromContext(ctx))
+	return provider, providerName, nil
 }

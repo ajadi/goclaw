@@ -75,6 +75,9 @@ func init() {
 		MsgNoDescription:         "Agent没有可供重新召唤的描述",
 		MsgInvalidPath:           "路径无效",
 
+		// Tenant backup / restore
+		MsgRestoreNewModeRejectsTenantID: "mode=new 会创建新租户；请传 tenant_slug（而非 tenant_id）作为新租户的 slug",
+
 		// Scheduler
 		MsgQueueFull:    "Session队列已满",
 		MsgShuttingDown: "网关正在关闭，请稍后重试",

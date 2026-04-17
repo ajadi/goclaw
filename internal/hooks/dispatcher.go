@@ -239,10 +239,10 @@ func (d *stdDispatcher) runSync(ctx context.Context, ev Event, chain []HookConfi
 
 		switch dec {
 		case DecisionBlock:
-			d.cb.record(cfg.ID, d.now(), d.store)
+			d.cb.record(ctx, cfg.ID, d.now(), d.store)
 			return FireResult{Decision: DecisionBlock}, nil
 		case DecisionTimeout:
-			d.cb.record(cfg.ID, d.now(), d.store)
+			d.cb.record(ctx, cfg.ID, d.now(), d.store)
 			if cfg.OnTimeout == DecisionBlock {
 				return FireResult{Decision: DecisionBlock}, nil
 			}
@@ -369,7 +369,11 @@ func (d *stdDispatcher) runAsync(ctx context.Context, ev Event, chain []HookConf
 			if execErr != nil {
 				errMsg = execErr.Error()
 			}
-			d.writeExec(context.Background(), c, ev, dec, duration, errMsg)
+			// Use WithoutCancel to preserve context values (TenantID, UserID)
+			// but detach from parent deadline, then add a timeout to prevent indefinite hang
+			writeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+			defer cancel()
+			d.writeExec(writeCtx, c, ev, dec, duration, errMsg)
 		}(cfg)
 	}
 }
@@ -475,7 +479,7 @@ func (cb *circuitBreaker) isTripped(id uuid.UUID, _ time.Time) bool {
 // threshold, trips the breaker and asks the store to persist enabled=false.
 // Persistence failure is logged only — the in-memory trip still protects the
 // current process.
-func (cb *circuitBreaker) record(id uuid.UUID, now time.Time, store HookStore) {
+func (cb *circuitBreaker) record(ctx context.Context, id uuid.UUID, now time.Time, store HookStore) {
 	cb.mu.Lock()
 	cutoff := now.Add(-cb.window)
 	kept := cb.hits[id][:0]
@@ -503,7 +507,10 @@ func (cb *circuitBreaker) record(id uuid.UUID, now time.Time, store HookStore) {
 	if store == nil {
 		return
 	}
-	if err := store.Update(context.Background(), id, map[string]any{"enabled": false}); err != nil {
+	// Use WithoutCancel to preserve context values, add 2s timeout for store update
+	storeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
+	defer cancel()
+	if err := store.Update(storeCtx, id, map[string]any{"enabled": false}); err != nil {
 		slog.Warn("security.hook.circuit_breaker_persist_failed", "hook_id", id, "err", err)
 	}
 }
