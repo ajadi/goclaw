@@ -22,6 +22,30 @@ Extends the existing Facebook comment auto-react (like) feature with per-channel
 
 ---
 
+### Secure CLI grant enforcement — registered binaries now hard-deny ungranted exec (2026-04-17)
+
+Closes a credential-scope bypass: an agent with no `secure_cli_agent_grants` row for a registered binary could still invoke it via shell fallthrough (`gh ...`, `sh -c 'gh ...'`) and pick up inherited env (`$GH_TOKEN`) or on-disk OAuth state (`~/.config/gh`). Registration is now an authorization boundary, not only a credential-injection hint.
+
+#### Security
+
+- **Shell gate (`internal/tools/shell.go`):** new enforcement branch runs after command normalization and before exec approval. Queries `SecureCLIStore.IsRegisteredBinary` per candidate; registered-but-ungranted binaries return `Binary %q requires a secure CLI grant. Ask admin to grant access to this agent.` Case-insensitive match (`filepath.Base(strings.ToLower(name))`) — macOS APFS safe.
+- **Wrapper unwrap (depth 3):** strips leading `sh -c / bash -c / zsh -c / dash -c`, `env K=V ...`, `nohup`, `stdbuf`, `timeout ...` before the check, so `sh -c 'gh api ...'` still denies. Nesting beyond 3 is rejected as adversarial.
+- **Fail-CLOSED:** lookup errors (DB down, 2s timeout) deny exec with a retry message, never fall through to host exec. New log events: `security.credentialed_binary_denied`, `security.credentialed_binary_gate_error`, `security.credentialed_binary_wrapper_too_deep`.
+- **Env scrubbing on fall-through (`internal/tools/env_scrub.go`):** child-process env is stripped of credential keys before spawn — static deny list (`GH_TOKEN`, `AWS_SECRET_ACCESS_KEY`, `OPENAI_API_KEY`, …) plus dynamic keys collected from every registered binary of the tenant. `HOME`, `PATH`, `TERM`, `LANG`, `USER`, `TZ` preserved. Prevents a non-`gh` command from inheriting `$GH_TOKEN`.
+- **Subagent wiring (`cmd/gateway_agents.go`):** subagent `ExecTool` registrations now receive the same `SecureCLIStore` via `buildSubagentToolsRegistry`. Parent agent can no longer bypass the gate by delegating the exec to a spawned child.
+- **`store.SecureCLIStore.IsRegisteredBinary`:** new method on both PG (`internal/store/pg/secure_cli.go`) and SQLite (`internal/store/sqlitestore/secure-cli.go`) backends. Scoped to tenant, returns case-insensitive match.
+
+#### Affected editions
+
+- **Standard (PG):** full gate.
+- **Lite (desktop/SQLite):** same gate via SQLite-backed `SecureCLIStore` — build-tag `sqliteonly` verified.
+
+#### Migration
+
+None. Existing binaries default `is_global=true` (no grant required) so current deployments are unaffected. To restrict a binary, set `is_global=false` and insert `secure_cli_agent_grants` rows per agent.
+
+---
+
 ### ACTOR vs SCOPE — #915 group permission fix + propagation (2026-04-16)
 
 Resolves Issue #915 (Telegram group `write_file` permission denied after `/addwriter`) and closes an adjacent silent-privilege-bypass discovered during the audit.

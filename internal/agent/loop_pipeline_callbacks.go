@@ -28,6 +28,7 @@ func (l *Loop) pipelineCallbacks(req *RunRequest, bridgeRS *runState) pipelineCa
 		event.TeamID = req.TeamID
 		event.TeamTaskID = req.TeamTaskID
 		event.ParentAgentID = req.ParentAgentID
+		event.SenderID = req.SenderID
 		event.UserID = req.UserID
 		event.Channel = req.Channel
 		event.ChatID = req.ChatID

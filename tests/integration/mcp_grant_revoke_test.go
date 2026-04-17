@@ -46,8 +46,8 @@ func TestBridgeTool_Execute_RevokeAgentGrant_ReturnsError(t *testing.T) {
 		t.Fatal("expected at least 1 accessible server after grant")
 	}
 
-	// Create BridgeTool with a nil client (execute path is exercised post-revoke;
-	// grant check runs before the client is used).
+	// Create BridgeTool with a nil client pointer — the test exercises the
+	// grant-recheck path, which must short-circuit before any client call.
 	clientPtr := &atomic.Pointer[mcpclient.Client]{}
 	connected := &atomic.Bool{}
 	connected.Store(true)
@@ -96,7 +96,14 @@ func TestBridgeTool_Execute_RevokeAgentGrant_ReturnsError(t *testing.T) {
 // Phase 01 TDD placeholder: skipped until Phase 02 (user-grant recheck at
 // execute time) lands.
 func TestBridgeTool_Execute_RevokeUserGrant_ReturnsError(t *testing.T) {
-	t.Skip("Phase 01 TDD placeholder — awaiting Phase 02 user-grant recheck implementation")
+	// TDD-red: Phase 02 user-grant revocation not yet implemented.
+	// ListAccessible's current SQL treats an absent mcp_user_grants row as
+	// "allowed by default" (mug.id IS NULL OR mug.enabled = true), so deleting
+	// the user grant row does not remove access. Implementing this requires
+	// either changing the semantics (user grant required when one ever existed)
+	// or a separate audit trail. Re-enable once Phase 02 lands.
+	t.Skip("Phase 02: user-grant-level revocation not yet implemented — see commit 8b8da3a3")
+
 	db := testDB(t)
 	tenantID, agentID := seedTenantAgent(t, db)
 	serverID := seedMCPServer(t, db, tenantID)
