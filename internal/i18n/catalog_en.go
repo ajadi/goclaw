@@ -73,6 +73,8 @@ func init() {
 		MsgAlreadySummoning:      "agent is already being summoned",
 		MsgSummoningUnavailable:  "summoning not available",
 		MsgNoDescription:         "agent has no description to resummon from",
+		MsgSummonCancelled:       "summon cancelled by user",
+		MsgCannotCancel:          "agent is not being summoned",
 		MsgInvalidPath:           "invalid path",
 
 		// Tenant backup / restore
