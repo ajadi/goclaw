@@ -21,8 +21,10 @@ on:
       tag-rules:
         description: |
           Multiline tag template for docker/metadata-action `tags` field.
-          May reference ${{ matrix.variant.name }} / ${{ matrix.variant.suffix }}.
-          Resolved at merge-job matrix expansion time inside this workflow.
+          May reference placeholders {{name}}, {{suffix}}, {{is_latest}},
+          {{is_variant}}. Callers cannot use matrix expressions directly
+          because matrix context is not available at caller scope.
+          Placeholders resolve inside the merge job at matrix-expansion time.
         required: true
         type: string
       cache-prefix:
@@ -132,6 +134,30 @@ jobs:
           path: /tmp/digests
           merge-multiple: true
 
+      - name: Resolve tag rules
+        id: tagrules
+        env:
+          TAG_RULES: ${{ inputs.tag-rules }}
+          NAME: ${{ matrix.variant.name }}
+          SUFFIX: ${{ matrix.variant.suffix }}
+        run: |
+          # Derive boolean placeholders from suffix presence
+          if [ -z "$SUFFIX" ]; then
+            IS_LATEST=true; IS_VARIANT=false
+          else
+            IS_LATEST=false; IS_VARIANT=true
+          fi
+          RESOLVED="$TAG_RULES"
+          RESOLVED="${RESOLVED//\{\{name\}\}/$NAME}"
+          RESOLVED="${RESOLVED//\{\{suffix\}\}/$SUFFIX}"
+          RESOLVED="${RESOLVED//\{\{is_latest\}\}/$IS_LATEST}"
+          RESOLVED="${RESOLVED//\{\{is_variant\}\}/$IS_VARIANT}"
+          {
+            echo 'rules<<RULES_EOF'
+            printf '%s\n' "$RESOLVED"
+            echo 'RULES_EOF'
+          } >> "$GITHUB_OUTPUT"
+
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -139,7 +165,7 @@ jobs:
           images: |
             ${{ env.GHCR_IMAGE }}
             ${{ env.DOCKERHUB_IMAGE }}
-          tags: ${{ inputs.tag-rules }}
+          tags: ${{ steps.tagrules.outputs.rules }}
 
       - name: Create and push multi-arch manifest (GHCR)
         run: |

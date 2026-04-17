@@ -160,9 +160,9 @@ jobs:
           {"name":"otel","suffix":"-otel","enable_otel":"true","enable_embedui":"true","enable_python":"true","enable_full_skills":"false"}
         ]
       tag-rules: |
-        type=raw,value=v${{ needs.release.outputs.version }},suffix=${{ matrix.variant.suffix }}
-        type=raw,value=latest,enable=${{ matrix.variant.suffix == '' }},suffix=
-        type=raw,value=${{ matrix.variant.name }},enable=${{ matrix.variant.suffix != '' }}
+        type=raw,value=v${{ needs.release.outputs.version }},suffix={{suffix}}
+        type=raw,value=latest,enable={{is_latest}},suffix=
+        type=raw,value={{name}},enable={{is_variant}}
       cache-prefix: release
       version: v${{ needs.release.outputs.version }}
     secrets:

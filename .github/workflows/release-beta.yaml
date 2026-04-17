@@ -96,9 +96,9 @@ jobs:
           {"name":"full","suffix":"-full","enable_otel":"false","enable_embedui":"true","enable_python":"true","enable_full_skills":"true"}
         ]
       tag-rules: |
-        type=raw,value=${{ github.ref_name }},suffix=${{ matrix.variant.suffix }}
-        type=raw,value=beta,enable=${{ matrix.variant.suffix == '' }},suffix=
-        type=raw,value=beta${{ matrix.variant.suffix }},enable=${{ matrix.variant.suffix != '' }}
+        type=raw,value=${{ github.ref_name }},suffix={{suffix}}
+        type=raw,value=beta,enable={{is_latest}},suffix=
+        type=raw,value=beta{{suffix}},enable={{is_variant}}
       cache-prefix: beta
       version: ${{ github.ref_name }}
     secrets:
