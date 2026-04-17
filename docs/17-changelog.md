@@ -4,6 +4,24 @@ All notable changes to GoClaw Gateway are documented here. Format follows [Keep 
 
 ---
 
+### Pancake auto-react allow/deny scope filter (2026-04-17)
+
+Extends the existing Facebook comment auto-react (like) feature with per-channel scope control.
+
+#### Added
+
+- `pancakeInstanceConfig.AutoReactOptions` (pointer type) in `internal/channels/pancake/types.go` — `allow_post_ids`, `deny_post_ids`, `allow_user_ids`, `deny_user_ids` string slices. Nil = no filter (react all).
+- `filterAutoReact()` + `containsString()` helpers in `internal/channels/pancake/comment_handler.go`. Pure function; deny lists override allow lists; whitespace-trimmed string equality.
+- Rollout-phase `slog.Info("pancake: auto-react filtered by allow/deny list")` fires when a gate-passing comment gets filtered (downgrade to Debug after ~2 weeks).
+- UI: `features.auto_react` toggle surface fix (previously required raw JSON edit) + 4 tags fields in `ui/web/src/pages/channels/channel-schemas.ts`, gated on `platform=facebook` + `features.auto_react=true`.
+
+#### Behaviour
+
+- Zero-config (existing channels) = no scope filter = existing react-all behaviour. Backward compatible.
+- Deny list entry with matching post/user ID → skip react. Empty allow list = no allow filter.
+
+---
+
 ### ACTOR vs SCOPE — #915 group permission fix + propagation (2026-04-16)
 
 Resolves Issue #915 (Telegram group `write_file` permission denied after `/addwriter`) and closes an adjacent silent-privilege-bypass discovered during the audit.
