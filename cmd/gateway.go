@@ -242,8 +242,8 @@ func runGateway() {
 		slog.Info("bootstrap: capabilities backfill complete", "agents", count)
 	}
 
-	// Subagent system
-	subagentMgr := setupSubagents(providerRegistry, cfg, msgBus, toolsReg, workspace, sandboxMgr)
+	// Subagent system (secureCLI store wired so subagent ExecTools enforce the gate)
+	subagentMgr := setupSubagents(providerRegistry, cfg, msgBus, toolsReg, workspace, sandboxMgr, pgStores.SecureCLI)
 	if subagentMgr != nil {
 		// Wire announce queue for batched subagent result delivery (matching TS debounce pattern).
 		announceQueue := tools.NewAnnounceQueue(1000, 20, makeDelegateAnnounceCallback(subagentMgr, msgBus))

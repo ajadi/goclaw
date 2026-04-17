@@ -293,6 +293,39 @@ The `exec` tool allows the LLM to run shell commands, with multiple defense laye
 }
 ```
 
+#### Grant enforcement (hard deny)
+
+Registering a binary is not the same as letting every agent exec it. A registered
+binary with `is_global=false` **requires a row in `secure_cli_agent_grants`**
+for the calling agent; otherwise shell exec is denied before any process runs.
+Closes the class of bypass where an ungranted agent could still invoke the
+binary via host fallthrough and pick up inherited env (`$GH_TOKEN`, etc.) or
+on-disk OAuth state (`~/.config/gh`).
+
+- **Enforcement site:** `internal/tools/shell.go` — gate runs after normalization
+  and before exec approval, keyed on `store.SecureCLIStore.IsRegisteredBinary`.
+- **Name matching:** `filepath.Base(strings.TrimSpace(strings.ToLower(name)))` —
+  case-insensitive (macOS APFS), directory-prefix stripped, trims whitespace.
+- **Shell wrapper unwrap:** detects and peels `sh -c / bash -c / zsh -c / dash -c`,
+  leading `env K=V ...`, `nohup`, `stdbuf`, `timeout ...` up to depth 3. Commands
+  nested deeper than 3 wrappers are rejected as adversarial.
+- **Global binaries:** `is_global=true` skips the gate (no grant needed). Shared
+  utilities without per-agent scoping.
+- **Fail-CLOSED:** if the grant lookup errors (DB down, timeout) the exec is
+  denied with a retry message. 2s per-lookup context timeout.
+- **Env scrubbing on fall-through:** when a command bypasses the credentialed
+  path and runs on the host, the child process env is scrubbed of credential
+  keys (static deny list + dynamic keys from every registered binary of the
+  same tenant) before spawn. Prevents `$GH_TOKEN` leaking into a non-gh command.
+- **Log events:**
+  - `security.credentialed_binary_denied` — agent attempted an ungranted
+    registered binary. Fields: `binary, wrapper, agent_id, tenant_id, command_prefix`.
+  - `security.credentialed_binary_gate_error` — lookup failed; exec denied.
+  - `security.credentialed_binary_wrapper_too_deep` — >3 shell wrappers.
+- **Subagents:** subagent `ExecTool`s are wired with the same `SecureCLIStore`
+  (`cmd/gateway_agents.go` → `buildSubagentToolsRegistry`) so a parent cannot
+  bypass the gate by delegating the exec to a spawned child.
+
 ---
 
 ### Deny Patterns
