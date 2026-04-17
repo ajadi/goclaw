@@ -220,6 +220,28 @@ const (
 	MsgTenantMismatch      = "error.tenant_mismatch"        // "tenant user does not belong to this tenant"
 	MsgTenantScopeRequired = "error.tenant_scope_required"  // "tenant scope is required for this operation"
 
+	// --- Workstation permissions ---
+	MsgWorkstationCmdDenied      = "error.workstation_cmd_denied"      // "command denied by workstation policy: %s"
+	MsgWorkstationEnvDenied      = "error.workstation_env_denied"      // "env var denied by policy: %s"
+	MsgWorkstationInputInvalid   = "error.workstation_input_invalid"   // "command contains invalid characters: %s"
+	MsgWorkstationRateLimit      = "error.workstation_rate_limit"      // "workstation rate limit exceeded"
+	MsgWorkstationPermNotFound   = "error.workstation_perm_not_found"  // "permission entry not found: %s"
+
+	// --- Workstation activity (Phase 7) ---
+	MsgWorkstationActivityTitle  = "ui.workstations.activity.title"       // "Recent Activity"
+	MsgWorkstationActionExec     = "ui.workstations.activity.action_exec" // "Exec"
+	MsgWorkstationActionDeny     = "ui.workstations.activity.action_deny" // "Denied"
+
+	// --- Workstation ---
+	MsgWorkstationNotFound   = "error.workstation_not_found"    // "workstation not found: %s"
+	MsgWorkstationKeyExists  = "error.workstation_key_exists"   // "workstation key already in use: %s"
+	MsgInvalidBackend        = "error.invalid_backend"          // "invalid backend type: %s (must be ssh|docker)"
+	MsgWorkstationInactive   = "error.workstation_inactive"     // "workstation is inactive: %s"
+	MsgInvalidMetadataShape  = "error.invalid_metadata_shape"   // "invalid metadata for %s backend: %s"
+	MsgWorkstationRequired   = "error.workstation_required"     // "no workstation bound to agent; pass workstation_id"
+	MsgWorkstationAccessDenied = "error.workstation_access_denied" // "agent %s not authorized for workstation %s"
+	MsgBackendNotReady       = "error.backend_not_ready"        // "workstation backend not ready: %s"
+
 	// --- Hooks ---
 	MsgHookInvalidMatcher           = "hook.invalid_matcher"            // "invalid matcher regex: %s"
 	MsgHookCommandDisabledStandard  = "hook.command_disabled_standard"  // "command-type hooks are only available on Lite edition"
