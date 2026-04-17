@@ -119,12 +119,9 @@ func normalizeEchoContent(content string) string {
 	return strings.TrimSpace(strings.Join(normalized, "\n"))
 }
 
-// firstInboxSentTTL controls how long a senderID is retained in firstInboxSent.
-// After this period, the sender can receive the first-inbox DM again (e.g. new session after a long gap).
-const firstInboxSentTTL = 72 * time.Hour
-
 // runDedupCleaner evicts dedup entries older than dedupTTL every dedupCleanEvery.
-// Also evicts firstInboxSent entries to bound memory growth on high-traffic pages.
+// The private-reply dedup lives in the PancakePrivateReplyStore (DB-backed),
+// so no longer participates in this in-memory eviction loop.
 func (ch *Channel) runDedupCleaner() {
 	ticker := time.NewTicker(dedupCleanEvery)
 	defer ticker.Stop()
@@ -143,12 +140,6 @@ func (ch *Channel) runDedupCleaner() {
 			ch.recentOutbound.Range(func(k, v any) bool {
 				if t, ok := v.(time.Time); ok && now.Sub(t) > outboundEchoTTL {
 					ch.recentOutbound.Delete(k)
-				}
-				return true
-			})
-			ch.firstInboxSent.Range(func(k, v any) bool {
-				if t, ok := v.(time.Time); ok && now.Sub(t) > firstInboxSentTTL {
-					ch.firstInboxSent.Delete(k)
 				}
 				return true
 			})

@@ -244,7 +244,31 @@
     "skills": { "label": "Skill过滤", "help": "限制此群组可用的Skill" },
     "tools": { "label": "工具白名单", "help": "限制Agent在此群组中可使用的工具" },
     "system_prompt": { "label": "系统提示词" },
-    "platform": { "label": "平台", "help": "选择此 Pancake 页面所服务的平台。" }
+    "platform": { "label": "平台", "help": "选择此 Pancake 页面所服务的平台。" },
+    "features.private_reply": {
+      "label": "私信回复（评论 → 私信）",
+      "help": "向评论者发送一次性私信。仅支持 Facebook/Instagram，且需在评论发出 7 天内送达（Meta 政策）。"
+    },
+    "private_reply_mode": {
+      "label": "私信模式",
+      "help": "Standalone 会跳过评论关键词过滤——只要收到评论就发送私信。"
+    },
+    "private_reply_message": {
+      "label": "私信内容",
+      "help": "支持 commenter_name 和 post_title 占位符。留空使用默认文本。"
+    },
+    "private_reply_ttl_days": {
+      "label": "再次私信间隔（天）",
+      "help": "同一评论者再次收到自动私信所需等待的天数，默认 7。"
+    },
+    "private_reply_options.allow_post_ids": {
+      "label": "允许的帖子 ID",
+      "help": "仅对这些帖子 ID 发送私信，留空则全部允许。"
+    },
+    "private_reply_options.deny_post_ids": {
+      "label": "禁用的帖子 ID",
+      "help": "对这些帖子 ID 跳过私信。"
+    }
   },
   "fieldOptions": {
     "block_reply": {
@@ -302,6 +326,10 @@
       "chat_plugin": "Chat Plugin",
       "lazada":      "Lazada",
       "tokopedia":   "Tokopedia"
+    },
+    "private_reply_mode": {
+      "after_reply": "公开回复后再发送私信（默认）",
+      "standalone":  "仅发送私信（不公开回复）"
     }
   },
   "groupOverrides": {

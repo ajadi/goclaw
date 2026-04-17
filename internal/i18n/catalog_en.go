@@ -211,5 +211,8 @@ func init() {
 		MsgHookBudgetExceeded:          "tenant hook token budget exceeded",
 		MsgHookPerTurnCapReached:       "hook invocation per-turn cap reached",
 		MsgHookBuiltinReadOnly:         "builtin hooks are read-only except for the enabled toggle",
+
+		MsgPancakePrivateReplyWindowExpired: "Private reply rejected: comment is older than 7 days (Meta policy)",
+		MsgPancakePrivateReplyDefault:       "Thanks for your comment! We'll continue helping you via private message.",
 	})
 }

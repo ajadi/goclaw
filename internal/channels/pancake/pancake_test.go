@@ -680,6 +680,17 @@ func (t *multiCaptureTransport) RoundTrip(req *http.Request) (*http.Response, er
 
 func newChannelWithMultiCapture(t *testing.T, cfg pancakeInstanceConfig) (*Channel, *multiCaptureTransport) {
 	t.Helper()
+	ch, transport, _ := newChannelWithMultiCaptureAndStore(t, cfg)
+	return ch, transport
+}
+
+// newChannelWithMultiCaptureAndStore returns a Channel wired with a fake
+// PancakePrivateReplyStore. Use this variant in tests that need to assert
+// store-level behaviour (dedup, mark calls, error injection).
+// The fake skips tenant-context checks so legacy tests that don't seed
+// store.WithTenantID keep working (see H5 note in plan phase 4).
+func newChannelWithMultiCaptureAndStore(t *testing.T, cfg pancakeInstanceConfig) (*Channel, *multiCaptureTransport, *fakePrivateReplyStore) {
+	t.Helper()
 	transport := &multiCaptureTransport{}
 	msgBus := bus.New()
 	cfg.PageID = "page-123"
@@ -690,7 +701,10 @@ func newChannelWithMultiCapture(t *testing.T, cfg pancakeInstanceConfig) (*Chann
 	}
 	ch.apiClient.httpClient = &http.Client{Transport: transport}
 	ch.platform = "facebook"
-	return ch, transport
+	fake := newFakePrivateReplyStore()
+	fake.SkipTenantCheck = true
+	ch.privateReplyStore = fake
+	return ch, transport, fake
 }
 
 func TestSend_CommentMode(t *testing.T) {
@@ -745,10 +759,10 @@ func TestSend_CommentMode_MissingCommentID_ReturnsError(t *testing.T) {
 	}
 }
 
-func TestSend_CommentMode_WithFirstInbox(t *testing.T) {
+func TestSend_CommentMode_WithPrivateReply(t *testing.T) {
 	cfg := pancakeInstanceConfig{}
-	cfg.Features.FirstInbox = true
-	cfg.FirstInboxMessage = "Thanks!"
+	cfg.Features.PrivateReply = true
+	cfg.PrivateReplyMessage = "Thanks!"
 	ch, transport := newChannelWithMultiCapture(t, cfg)
 
 	err := ch.Send(context.Background(), bus.OutboundMessage{
@@ -783,10 +797,10 @@ func TestSend_CommentMode_WithFirstInbox(t *testing.T) {
 	}
 }
 
-func TestSend_CommentMode_FirstInboxDedup(t *testing.T) {
+func TestSend_CommentMode_PrivateReplyDedup(t *testing.T) {
 	cfg := pancakeInstanceConfig{}
-	cfg.Features.FirstInbox = true
-	cfg.FirstInboxMessage = "DM!"
+	cfg.Features.PrivateReply = true
+	cfg.PrivateReplyMessage = "DM!"
 	ch, transport := newChannelWithMultiCapture(t, cfg)
 
 	outMsg := bus.OutboundMessage{
@@ -828,9 +842,9 @@ func TestSend_CommentMode_FirstInboxDedup(t *testing.T) {
 	}
 }
 
-func TestSend_CommentMode_FirstInboxDisabled(t *testing.T) {
+func TestSend_CommentMode_PrivateReplyDisabled(t *testing.T) {
 	cfg := pancakeInstanceConfig{}
-	cfg.Features.FirstInbox = false
+	cfg.Features.PrivateReply = false
 	ch, transport := newChannelWithMultiCapture(t, cfg)
 
 	ch.Send(context.Background(), bus.OutboundMessage{ //nolint:errcheck
@@ -851,7 +865,7 @@ func TestSend_CommentMode_FirstInboxDisabled(t *testing.T) {
 	var p map[string]any
 	json.Unmarshal(transport.bodies[0], &p)
 	if p["action"] == "private_reply" {
-		t.Error("should not send private_reply when FirstInbox is disabled")
+		t.Error("should not send private_reply when PrivateReply is disabled")
 	}
 }
 
@@ -898,14 +912,15 @@ func TestSend_CommentMode_EchoRemembered(t *testing.T) {
 	}
 }
 
-// --- First Inbox ---
+// --- Private Reply ---
 
-func TestSendFirstInbox_DefaultMessage(t *testing.T) {
+func TestSendPrivateReply_DefaultMessage(t *testing.T) {
 	cfg := pancakeInstanceConfig{}
-	cfg.FirstInboxMessage = "" // empty = use default
-	ch, transport := newChannelWithMultiCapture(t, cfg)
+	cfg.Features.PrivateReply = true
+	cfg.PrivateReplyMessage = "" // empty = use default
+	ch, transport, _ := newChannelWithMultiCaptureAndStore(t, cfg)
 
-	ch.sendFirstInbox(context.Background(), "user-1", "conv-123")
+	ch.sendPrivateReply(context.Background(), "user-1", "conv-123", "", "")
 
 	transport.mu.Lock()
 	defer transport.mu.Unlock()
@@ -919,16 +934,17 @@ func TestSendFirstInbox_DefaultMessage(t *testing.T) {
 	}
 	msg, _ := p["message"].(string)
 	if msg == "" {
-		t.Error("expected non-empty default first inbox message")
+		t.Error("expected non-empty default private reply message")
 	}
 }
 
-func TestSendFirstInbox_CustomMessage(t *testing.T) {
+func TestSendPrivateReply_CustomMessage(t *testing.T) {
 	cfg := pancakeInstanceConfig{}
-	cfg.FirstInboxMessage = "Thanks for your comment!"
-	ch, transport := newChannelWithMultiCapture(t, cfg)
+	cfg.Features.PrivateReply = true
+	cfg.PrivateReplyMessage = "Thanks for your comment!"
+	ch, transport, _ := newChannelWithMultiCaptureAndStore(t, cfg)
 
-	ch.sendFirstInbox(context.Background(), "user-1", "conv-123")
+	ch.sendPrivateReply(context.Background(), "user-1", "conv-123", "", "")
 
 	transport.mu.Lock()
 	defer transport.mu.Unlock()
@@ -942,7 +958,9 @@ func TestSendFirstInbox_CustomMessage(t *testing.T) {
 	}
 }
 
-func TestSendFirstInbox_ErrorRetryAllowed(t *testing.T) {
+func TestSendPrivateReply_APIErrorReleasesClaim(t *testing.T) {
+	// Claim-first semantics: TryClaim marks the slot, then on API failure
+	// Unclaim releases it so the next comment from the same sender can retry.
 	errorTransport := &captureTransport{
 		resp: &http.Response{
 			StatusCode: http.StatusInternalServerError,
@@ -951,26 +969,32 @@ func TestSendFirstInbox_ErrorRetryAllowed(t *testing.T) {
 		},
 	}
 	cfg := pancakeInstanceConfig{}
-	cfg.FirstInboxMessage = "DM"
+	cfg.Features.PrivateReply = true
+	cfg.PrivateReplyMessage = "DM"
 	msgBus := bus.New()
 	cfg.PageID = "page-123"
 	creds := pancakeCreds{APIKey: "k", PageAccessToken: "t"}
 	ch, _ := New(cfg, creds, msgBus, nil)
 	ch.apiClient.httpClient = &http.Client{Transport: errorTransport}
+	fake := newFakePrivateReplyStore()
+	fake.SkipTenantCheck = true
+	ch.privateReplyStore = fake
 
-	// First call: API error → firstInboxSent entry should be deleted (allows retry).
-	ch.sendFirstInbox(context.Background(), "user-1", "conv-123")
-	_, alreadyStored := ch.firstInboxSent.Load("user-1")
-	if alreadyStored {
-		t.Error("firstInboxSent should be deleted on error (allow retry)")
+	ch.sendPrivateReply(context.Background(), "user-1", "conv-123", "", "")
+
+	if fake.tryClaimCalls != 1 {
+		t.Errorf("TryClaim calls = %d; want 1", fake.tryClaimCalls)
+	}
+	if fake.unclaimCalls != 1 {
+		t.Errorf("Unclaim calls = %d; want 1 (must release claim on API failure)", fake.unclaimCalls)
 	}
 
-	// Second call: should attempt again (retry allowed).
+	// Second call: should attempt again (dedup store says not sent).
 	secondTransport := &captureTransport{}
 	ch.apiClient.httpClient = &http.Client{Transport: secondTransport}
-	ch.sendFirstInbox(context.Background(), "user-1", "conv-123")
+	ch.sendPrivateReply(context.Background(), "user-1", "conv-123", "", "")
 	if secondTransport.req == nil {
-		t.Error("expected retry request after error-deletion")
+		t.Error("expected retry request after previous failure")
 	}
 }
 
@@ -1006,8 +1030,8 @@ func TestFactoryExplicitPlatformPreserved(t *testing.T) {
 func TestCommentFlowEndToEnd(t *testing.T) {
 	cfg := pancakeInstanceConfig{}
 	cfg.Features.CommentReply = true
-	cfg.Features.FirstInbox = true
-	cfg.FirstInboxMessage = "Welcome!"
+	cfg.Features.PrivateReply = true
+	cfg.PrivateReplyMessage = "Welcome!"
 	transport := &multiCaptureTransport{}
 	msgBus := bus.New()
 	cfg.PageID = "page-e2e"
@@ -1018,6 +1042,9 @@ func TestCommentFlowEndToEnd(t *testing.T) {
 	}
 	ch.apiClient.httpClient = &http.Client{Transport: transport}
 	ch.platform = "facebook"
+	fake := newFakePrivateReplyStore()
+	fake.SkipTenantCheck = true
+	ch.privateReplyStore = fake
 
 	router := &webhookRouter{instances: map[string]*Channel{"page-e2e": ch}}
 

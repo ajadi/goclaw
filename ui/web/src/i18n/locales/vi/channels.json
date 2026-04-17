@@ -244,7 +244,31 @@
     "skills": { "label": "Bộ lọc skill", "help": "Giới hạn skill khả dụng cho nhóm này" },
     "tools": { "label": "Danh sách công cụ được phép", "help": "Giới hạn công cụ agent có thể dùng trong nhóm này" },
     "system_prompt": { "label": "Prompt hệ thống" },
-    "platform": { "label": "Nền tảng", "help": "Chọn nền tảng mà trang Pancake này phục vụ." }
+    "platform": { "label": "Nền tảng", "help": "Chọn nền tảng mà trang Pancake này phục vụ." },
+    "features.private_reply": {
+      "label": "Private Reply (Comment → DM)",
+      "help": "Gửi tin nhắn riêng cho người bình luận. Chỉ Facebook/Instagram. DM phải gửi trong vòng 7 ngày kể từ khi có bình luận (chính sách Meta)."
+    },
+    "private_reply_mode": {
+      "label": "Chế độ DM",
+      "help": "Standalone bỏ qua bộ lọc từ khoá — DM gửi cho mọi bình luận hợp lệ."
+    },
+    "private_reply_message": {
+      "label": "Nội dung DM",
+      "help": "Hỗ trợ biến commenter_name và post_title. Để trống dùng mặc định."
+    },
+    "private_reply_ttl_days": {
+      "label": "Thời gian chờ DM lại (ngày)",
+      "help": "Số ngày trước khi cùng một người có thể nhận DM tự động lần nữa. Mặc định 7."
+    },
+    "private_reply_options.allow_post_ids": {
+      "label": "Post ID được phép",
+      "help": "Chỉ DM trên các post ID này. Để trống = tất cả bài."
+    },
+    "private_reply_options.deny_post_ids": {
+      "label": "Post ID bị chặn",
+      "help": "Không DM cho các post ID này."
+    }
   },
   "fieldOptions": {
     "block_reply": {
@@ -302,6 +326,10 @@
       "chat_plugin": "Chat Plugin (Website)",
       "lazada":      "Lazada",
       "tokopedia":   "Tokopedia"
+    },
+    "private_reply_mode": {
+      "after_reply": "Sau khi trả lời công khai (mặc định)",
+      "standalone":  "Chỉ DM (không trả lời công khai)"
     }
   },
   "groupOverrides": {

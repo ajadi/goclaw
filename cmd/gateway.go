@@ -447,7 +447,7 @@ func runGateway() {
 		instanceLoader.RegisterFactory(channels.TypeWhatsApp, whatsapp.FactoryWithDBAudio(pgStores.DB, pgStores.PendingMessages, "pgx", audioMgr, pgStores.BuiltinTools))
 		instanceLoader.RegisterFactory(channels.TypeSlack, slackchannel.FactoryWithPendingStore(pgStores.PendingMessages))
 		instanceLoader.RegisterFactory(channels.TypeFacebook, facebook.Factory)
-		instanceLoader.RegisterFactory(channels.TypePancake, pancake.Factory)
+		instanceLoader.RegisterFactory(channels.TypePancake, pancake.FactoryWithStores(pgStores.PancakePrivateReply))
 		if err := instanceLoader.LoadAll(context.Background()); err != nil {
 			slog.Error("failed to load channel instances from DB", "error", err)
 		}

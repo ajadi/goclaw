@@ -7,19 +7,24 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nextlevelbuilder/goclaw/internal/bus"
 	"github.com/nextlevelbuilder/goclaw/internal/channels"
 )
 
 // handleCommentEvent processes a Pancake COMMENT webhook event.
 // Mirrors the inbox handler pattern with additional comment-specific guards.
 func (ch *Channel) handleCommentEvent(data MessagingData) {
-	// Feature gate — exit only if BOTH reply and auto-react are disabled.
-	if !ch.config.Features.CommentReply && !ch.config.Features.AutoReact {
+	mode := resolvePrivateReplyMode(&ch.config)
+	privateReplyOnly := mode == "standalone" && ch.config.Features.PrivateReply
+
+	// Feature gate — exit if NOTHING to do. Standalone mode keeps the handler
+	// alive even when comment_reply is off, as long as private_reply is on.
+	if !ch.config.Features.CommentReply && !ch.config.Features.AutoReact && !privateReplyOnly {
 		ch.commentReplyDisabledOnce.Do(func() {
-			slog.Info("pancake: comment ignored because comment_reply and auto_react are both disabled",
+			slog.Info("pancake: comment ignored because comment_reply, auto_react, and private_reply are all disabled",
 				"page_id", ch.pageID,
 				"channel_name", ch.Name(),
-				"hint", "enable config.features.comment_reply or config.features.auto_react")
+				"hint", "enable config.features.comment_reply, auto_react, or private_reply")
 		})
 		return
 	}
@@ -70,13 +75,15 @@ func (ch *Channel) handleCommentEvent(data MessagingData) {
 		}
 	}
 
-	// Comment reply gate — independent of auto_react above.
-	if !ch.config.Features.CommentReply {
+	// Comment reply gate — independent of auto_react above. Standalone mode
+	// proceeds even with comment_reply disabled (DM-only funnel).
+	if !ch.config.Features.CommentReply && !privateReplyOnly {
 		return
 	}
 
-	// Comment filter.
-	if !ch.filterComment(data.Message.Content) {
+	// Comment filter applies only to public reply content. Standalone mode
+	// skips it because the DM is a template, not a filter-dependent response.
+	if !privateReplyOnly && !ch.filterComment(data.Message.Content) {
 		slog.Debug("pancake: comment filtered out",
 			"page_id", ch.pageID, "msg_id", data.Message.ID)
 		return
@@ -102,9 +109,35 @@ func (ch *Channel) handleCommentEvent(data MessagingData) {
 		"message_id":          dedupKey,
 		"display_name":        channels.SanitizeDisplayName(data.Message.SenderName),
 		"page_name":           ch.pageName,
+		"private_reply_mode":  mode,
+	}
+	if privateReplyOnly {
+		metadata["private_reply_only"] = "true"
 	}
 	if data.PostID != "" {
 		metadata["post_id"] = data.PostID
+	}
+
+	// Standalone fast-path (plan H6 fix): bypass the agent pipeline. The DM is a
+	// template, not an LLM-generated response — running the pipeline would burn
+	// tokens on a message that will be discarded in sendCommentReply. Publish a
+	// synthetic outbound directly so dispatchOutbound → Send → sendCommentReply
+	// → sendPrivateReply handles it without touching HandleMessage.
+	if privateReplyOnly {
+		_ = content // built for logging parity; pipeline skipped on purpose
+		outbound := bus.OutboundMessage{
+			Channel:  ch.Name(),
+			ChatID:   data.ConversationID,
+			Content:  "", // sendPrivateReply renders the template at send time
+			Metadata: metadata,
+		}
+		if mb := ch.Bus(); mb != nil {
+			mb.PublishOutbound(outbound)
+		} else {
+			slog.Warn("pancake: standalone fast-path skipped — bus nil",
+				"page_id", ch.pageID, "sender_id", data.Message.SenderID)
+		}
+		return
 	}
 
 	// ChatID = ConversationID: Pancake groups COMMENT conversations per sender per post.

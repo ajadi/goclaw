@@ -6,6 +6,28 @@ All notable changes to GoClaw are documented here. For full documentation, see [
 
 ### Breaking Changes
 
+- **Pancake channel: `first_inbox` → `private_reply` rename.** Matches the
+  Pancake API + Facebook Graph policy term. Channel config keys + feature flag
+  renamed:
+  - `features.first_inbox` → `features.private_reply`
+  - `first_inbox_message` → `private_reply_message` (supports `{{commenter_name}}`
+    and `{{post_title}}` template vars)
+
+  Migration SQL for existing deployments (dev-only deployments can skip — the
+  feature was five days old with minimal adoption):
+  ```sql
+  UPDATE channel_instances
+  SET config = jsonb_set(
+    jsonb_set(
+      config - 'features' - 'first_inbox_message' || jsonb_build_object('first_inbox_message', null),
+      '{features,private_reply}', (config->'features'->'first_inbox'), true
+    ),
+    '{private_reply_message}', (config->'first_inbox_message'), true
+  )
+  WHERE channel_type = 'pancake'
+    AND config->'features' ? 'first_inbox';
+  ```
+
 - **Context pruning now opt-in.** Previously tool-result trimming ran by default
   for all providers; now requires explicit `contextPruning.mode: "cache-ttl"` in
   `config.agents.defaults` to enable. Matches upstream TS design and prevents
@@ -20,6 +42,35 @@ All notable changes to GoClaw are documented here. For full documentation, see [
   }
   ```
 
+### New Features
+
+- **Pancake private-reply funnel.** Expands the renamed `private_reply` feature
+  into a full comment → DM funnel:
+  - **Two modes** via `private_reply_mode`: `after_reply` (default — public
+    reply then DM) and `standalone` (DM-only, bypasses keyword filter, skips
+    the LLM pipeline via a synthetic outbound fast-path).
+  - **Post-level scope filter** via `private_reply_options.allow_post_ids` /
+    `deny_post_ids` (deny beats allow; nil = send to all posts).
+  - **Configurable TTL** via `private_reply_ttl_days` (default 7) — how long
+    before the same commenter can receive the auto-DM again.
+  - **Template variables** `{{commenter_name}}` and `{{post_title}}` with
+    literal-replace semantics (pre-sanitizes `{{`/`}}` from var values to
+    prevent var-in-var substitution).
+  - **DB-backed dedup** (`pancake_private_reply_sent`) replaces the in-memory
+    `sync.Map` — survives channel restarts. Atomic TryClaim/Unclaim eliminates
+    the concurrent-comment TOCTOU that would have fired duplicate DMs.
+  - **Locale-aware default text** when operator leaves `private_reply_message`
+    blank — resolves via `i18n.T(locale, MsgPancakePrivateReplyDefault)` with
+    en/vi/zh catalogs and English fallback.
+  - PG migration 000056; SQLite schema v25 (RequiredSchemaVersion 55→56).
+- **Prometheus `/metrics` endpoint.** New `internal/metrics` package exposes
+  `pancake_private_reply_total{page_id,result,reason}` counters (result ∈
+  `sent|skipped|failed`; reason covers `feature_off`, `store_unwired`,
+  `scope_filter`, `dedup_hit`, `dedup_error`, `api_error`). Endpoint is gated
+  behind Bearer auth when `gateway.token` is set; open for local dev scraping
+  when unset (warns in logs). Bind `GOCLAW_HOST=127.0.0.1` or set a token to
+  avoid leaking page identifiers on public networks.
+
 ### Improvements
 
 - **Context pruning cleanup.** Removed redundant Pass 0 (per-result 30% guard),
@@ -30,6 +81,16 @@ All notable changes to GoClaw are documented here. For full documentation, see [
   missing a `mode` field get auto-backfilled with `mode: "cache-ttl"` to
   preserve their intent after the opt-in flip. Rows with NULL config stay
   NULL (new opt-in default applies). PG migration 51; SQLite schema v19.
+- **Pancake channel metadata routing.** Whitelist in
+  `internal/channels/routing_metadata.go` now preserves `private_reply_mode`,
+  `private_reply_only`, `post_id`, `display_name` across the inbound →
+  outbound hop so mode switch + scope filter + template vars survive the
+  agent pipeline round-trip. Without this, these keys were silently stripped.
+- **Channel `Send` tenant propagation.** Pancake `Channel.Send` now injects
+  `store.WithTenantID(ctx, ch.TenantID())` before dispatching so store calls
+  scoped by tenant (notably the new private-reply dedup store) see a non-nil
+  tenant under the dispatcher path. Matches the pattern used by Telegram,
+  Zalo, WhatsApp.
 
 ## Project Status
 

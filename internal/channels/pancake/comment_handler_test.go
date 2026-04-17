@@ -103,7 +103,7 @@ func TestHandleCommentEvent_FeatureDisabledLogsDiagnostic(t *testing.T) {
 	ch.handleCommentEvent(commentEvent("page-1", "conv-2", "user-2", "msg-2", "hello again"))
 
 	out := buf.String()
-	if count := strings.Count(out, "comment_reply and auto_react are both disabled"); count != 1 {
+	if count := strings.Count(out, "comment_reply, auto_react, and private_reply are all disabled"); count != 1 {
 		t.Fatalf("expected exactly one diagnostic log for disabled features, got %d logs:\n%s", count, out)
 	}
 	if !strings.Contains(out, "page-1") {

@@ -22,18 +22,29 @@ type pancakeInstanceConfig struct {
 	Features struct {
 		InboxReply   bool `json:"inbox_reply"`
 		CommentReply bool `json:"comment_reply"`
-		FirstInbox   bool `json:"first_inbox"`  // send one-time DM to commenter after comment reply
-		AutoReact    bool `json:"auto_react"`   // auto-like user comments on Facebook (platform=facebook only)
+		PrivateReply bool `json:"private_reply"` // send one-time DM to commenter (after comment reply or standalone)
+		AutoReact    bool `json:"auto_react"`    // auto-like user comments on Facebook (platform=facebook only)
 	} `json:"features"`
 	CommentReplyOptions struct {
 		IncludePostContext bool     `json:"include_post_context"` // prepend post text to comment content
 		Filter             string   `json:"filter"`               // "all" | "keyword" (default: all)
 		Keywords           []string `json:"keywords"`             // required when filter = "keyword"
 	} `json:"comment_reply_options"`
-	FirstInboxMessage   string   `json:"first_inbox_message,omitempty"`    // custom DM text; defaults to built-in message
-	PostContextCacheTTL string   `json:"post_context_cache_ttl,omitempty"` // e.g. "30m"; defaults to 15m
-	AllowFrom           []string `json:"allow_from,omitempty"`
-	BlockReply          *bool    `json:"block_reply,omitempty"` // override gateway block_reply (nil = inherit)
+	PrivateReplyMessage string               `json:"private_reply_message,omitempty"`  // custom DM text; defaults to built-in message. Supports {{commenter_name}} / {{post_title}} vars.
+	PrivateReplyMode    string               `json:"private_reply_mode,omitempty"`     // "after_reply" (default) | "standalone"
+	PrivateReplyTTLDays int                  `json:"private_reply_ttl_days,omitempty"` // 0 = use default (7 days)
+	PrivateReplyOptions *PrivateReplyOptions `json:"private_reply_options,omitempty"`  // nil = no scope filter (DM all commenters)
+	PostContextCacheTTL string               `json:"post_context_cache_ttl,omitempty"` // e.g. "30m"; defaults to 15m
+	AllowFrom           []string             `json:"allow_from,omitempty"`
+	BlockReply          *bool                `json:"block_reply,omitempty"` // override gateway block_reply (nil = inherit)
+}
+
+// PrivateReplyOptions holds post-level scope filters for the private reply DM.
+// Nil = no filter (send DM to all commenters on all posts).
+// Deny is evaluated BEFORE allow: post in both lists = denied.
+type PrivateReplyOptions struct {
+	AllowPostIDs []string `json:"allow_post_ids,omitempty"`
+	DenyPostIDs  []string `json:"deny_post_ids,omitempty"`
 }
 
 // --- Webhook payload types ---

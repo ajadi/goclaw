@@ -211,5 +211,8 @@ func init() {
 		MsgHookBudgetExceeded:          "tenant đã vượt ngân sách token cho hook",
 		MsgHookPerTurnCapReached:       "đã đạt giới hạn số lần gọi hook trong một lượt",
 		MsgHookBuiltinReadOnly:         "hook dựng sẵn chỉ cho phép bật/tắt, không thể chỉnh sửa",
+
+		MsgPancakePrivateReplyWindowExpired: "Không gửi được tin nhắn riêng: bình luận đã quá 7 ngày (chính sách Meta)",
+		MsgPancakePrivateReplyDefault:       "Cảm ơn bạn đã bình luận! Shop sẽ hỗ trợ bạn qua tin nhắn riêng.",
 	})
 }
