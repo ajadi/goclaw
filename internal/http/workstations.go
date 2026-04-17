@@ -419,6 +419,19 @@ func (h *WorkstationsHandler) handleActivityList(w http.ResponseWriter, r *http.
 		return
 	}
 
+	// Ownership check: verify the workstation belongs to the caller's tenant.
+	// GetByID scopes by tenant_id — returns ErrNoRows if workstation is in a different tenant.
+	if _, err := h.wsStore.GetByID(ctx, wsID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeError(w, http.StatusNotFound, protocol.ErrNotFound,
+				i18n.T(locale, i18n.MsgWorkstationNotFound, wsID.String()))
+			return
+		}
+		writeError(w, http.StatusInternalServerError, protocol.ErrInternal,
+			i18n.T(locale, i18n.MsgInternalError, err.Error()))
+		return
+	}
+
 	limit := 50
 	if lStr := r.URL.Query().Get("limit"); lStr != "" {
 		if l, err := strconv.Atoi(lStr); err == nil && l > 0 && l <= 200 {

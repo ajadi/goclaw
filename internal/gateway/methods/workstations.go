@@ -94,7 +94,10 @@ func (m *WorkstationsMethods) handleGet(ctx context.Context, client *gateway.Cli
 		ID string `json:"id"`
 	}
 	if req.Params != nil {
-		json.Unmarshal(req.Params, &params)
+		if err := json.Unmarshal(req.Params, &params); err != nil {
+			client.SendResponse(protocol.NewErrorResponse(req.ID, protocol.ErrInvalidRequest, "invalid params"))
+			return
+		}
 	}
 	id, err := uuid.Parse(params.ID)
 	if err != nil {
@@ -128,7 +131,10 @@ func (m *WorkstationsMethods) handleCreate(ctx context.Context, client *gateway.
 		CreatedBy      string                     `json:"createdBy"`
 	}
 	if req.Params != nil {
-		json.Unmarshal(req.Params, &params)
+		if err := json.Unmarshal(req.Params, &params); err != nil {
+			client.SendResponse(protocol.NewErrorResponse(req.ID, protocol.ErrInvalidRequest, "invalid params"))
+			return
+		}
 	}
 
 	if params.WorkstationKey == "" {
@@ -182,7 +188,10 @@ func (m *WorkstationsMethods) handleUpdate(ctx context.Context, client *gateway.
 		Updates map[string]any `json:"updates"`
 	}
 	if req.Params != nil {
-		json.Unmarshal(req.Params, &params)
+		if err := json.Unmarshal(req.Params, &params); err != nil {
+			client.SendResponse(protocol.NewErrorResponse(req.ID, protocol.ErrInvalidRequest, "invalid params"))
+			return
+		}
 	}
 	id, err := uuid.Parse(params.ID)
 	if err != nil {
@@ -235,7 +244,10 @@ func (m *WorkstationsMethods) handleDelete(ctx context.Context, client *gateway.
 		ID string `json:"id"`
 	}
 	if req.Params != nil {
-		json.Unmarshal(req.Params, &params)
+		if err := json.Unmarshal(req.Params, &params); err != nil {
+			client.SendResponse(protocol.NewErrorResponse(req.ID, protocol.ErrInvalidRequest, "invalid params"))
+			return
+		}
 	}
 	id, err := uuid.Parse(params.ID)
 	if err != nil {
@@ -266,7 +278,10 @@ func (m *WorkstationsMethods) handleLinkAgent(ctx context.Context, client *gatew
 		IsDefault     bool   `json:"isDefault"`
 	}
 	if req.Params != nil {
-		json.Unmarshal(req.Params, &params)
+		if err := json.Unmarshal(req.Params, &params); err != nil {
+			client.SendResponse(protocol.NewErrorResponse(req.ID, protocol.ErrInvalidRequest, "invalid params"))
+			return
+		}
 	}
 	agentID, err := uuid.Parse(params.AgentID)
 	if err != nil {
@@ -300,7 +315,10 @@ func (m *WorkstationsMethods) handleUnlinkAgent(ctx context.Context, client *gat
 		WorkstationID string `json:"workstationId"`
 	}
 	if req.Params != nil {
-		json.Unmarshal(req.Params, &params)
+		if err := json.Unmarshal(req.Params, &params); err != nil {
+			client.SendResponse(protocol.NewErrorResponse(req.ID, protocol.ErrInvalidRequest, "invalid params"))
+			return
+		}
 	}
 	agentID, err := uuid.Parse(params.AgentID)
 	if err != nil {
@@ -342,7 +360,10 @@ func (m *WorkstationsMethods) handlePermList(ctx context.Context, client *gatewa
 		WorkstationID string `json:"workstationId"`
 	}
 	if req.Params != nil {
-		json.Unmarshal(req.Params, &params)
+		if err := json.Unmarshal(req.Params, &params); err != nil {
+			client.SendResponse(protocol.NewErrorResponse(req.ID, protocol.ErrInvalidRequest, "invalid params"))
+			return
+		}
 	}
 	wsID, err := uuid.Parse(params.WorkstationID)
 	if err != nil {
@@ -369,7 +390,10 @@ func (m *WorkstationsMethods) handlePermAdd(ctx context.Context, client *gateway
 		Pattern       string `json:"pattern"`
 	}
 	if req.Params != nil {
-		json.Unmarshal(req.Params, &params)
+		if err := json.Unmarshal(req.Params, &params); err != nil {
+			client.SendResponse(protocol.NewErrorResponse(req.ID, protocol.ErrInvalidRequest, "invalid params"))
+			return
+		}
 	}
 	wsID, err := uuid.Parse(params.WorkstationID)
 	if err != nil {
@@ -418,7 +442,10 @@ func (m *WorkstationsMethods) handlePermRemove(ctx context.Context, client *gate
 		ID string `json:"id"`
 	}
 	if req.Params != nil {
-		json.Unmarshal(req.Params, &params)
+		if err := json.Unmarshal(req.Params, &params); err != nil {
+			client.SendResponse(protocol.NewErrorResponse(req.ID, protocol.ErrInvalidRequest, "invalid params"))
+			return
+		}
 	}
 	id, err := uuid.Parse(params.ID)
 	if err != nil {
@@ -449,7 +476,10 @@ func (m *WorkstationsMethods) handlePermToggle(ctx context.Context, client *gate
 		Enabled bool   `json:"enabled"`
 	}
 	if req.Params != nil {
-		json.Unmarshal(req.Params, &params)
+		if err := json.Unmarshal(req.Params, &params); err != nil {
+			client.SendResponse(protocol.NewErrorResponse(req.ID, protocol.ErrInvalidRequest, "invalid params"))
+			return
+		}
 	}
 	id, err := uuid.Parse(params.ID)
 	if err != nil {
@@ -480,12 +510,27 @@ func (m *WorkstationsMethods) handleListActivity(ctx context.Context, client *ga
 		Cursor        string `json:"cursor"`
 	}
 	if req.Params != nil {
-		json.Unmarshal(req.Params, &params)
+		if err := json.Unmarshal(req.Params, &params); err != nil {
+			client.SendResponse(protocol.NewErrorResponse(req.ID, protocol.ErrInvalidRequest, "invalid params"))
+			return
+		}
 	}
 	wsID, err := uuid.Parse(params.WorkstationID)
 	if err != nil {
 		client.SendResponse(protocol.NewErrorResponse(req.ID, protocol.ErrInvalidRequest,
 			i18n.T(locale, i18n.MsgInvalidID, "workstation")))
+		return
+	}
+	// Ownership check: verify the workstation belongs to the caller's tenant.
+	// GetByID scopes by tenant_id — returns ErrNoRows if workstation is in a different tenant.
+	if _, err := m.wsStore.GetByID(ctx, wsID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			client.SendResponse(protocol.NewErrorResponse(req.ID, protocol.ErrNotFound,
+				i18n.T(locale, i18n.MsgWorkstationNotFound, params.WorkstationID)))
+			return
+		}
+		client.SendResponse(protocol.NewErrorResponse(req.ID, protocol.ErrInternal,
+			i18n.T(locale, i18n.MsgInternalError, err.Error())))
 		return
 	}
 	limit := params.Limit

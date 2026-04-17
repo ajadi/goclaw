@@ -5,7 +5,6 @@ package security
 
 import (
 	"strings"
-	"unicode"
 
 	"golang.org/x/text/unicode/norm"
 )
@@ -67,13 +66,3 @@ func containsDangerousBytes(s string) bool {
 		strings.ContainsRune(s, '\n')
 }
 
-// containsControlChars returns true if s contains control characters other than
-// standard whitespace (tab is allowed). Used as a defense-in-depth check.
-func containsControlChars(s string) bool {
-	for _, r := range s {
-		if r != '\t' && unicode.IsControl(r) {
-			return true
-		}
-	}
-	return false
-}

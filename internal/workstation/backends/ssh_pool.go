@@ -208,6 +208,7 @@ func (p *clientPool) CloseWorkstation(wsID uuid.UUID) {
 	clients := p.clients[wsID]
 	delete(p.clients, wsID)
 	delete(p.circuits, wsID)
+	delete(p.sem, wsID)
 	p.mu.Unlock()
 	for _, pc := range clients {
 		_ = pc.client.Close()
@@ -220,6 +221,8 @@ func (p *clientPool) Close() {
 	p.mu.Lock()
 	all := p.clients
 	p.clients = make(map[uuid.UUID][]*pooledClient)
+	p.circuits = make(map[uuid.UUID]*circuitState)
+	p.sem = make(map[uuid.UUID]chan struct{})
 	p.mu.Unlock()
 	for _, pcs := range all {
 		for _, pc := range pcs {
@@ -256,6 +259,8 @@ func (p *clientPool) prune() {
 		}
 		if len(kept) == 0 {
 			delete(p.clients, wsID)
+			delete(p.circuits, wsID)
+			delete(p.sem, wsID)
 		} else {
 			p.clients[wsID] = kept
 		}
