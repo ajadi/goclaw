@@ -17,7 +17,7 @@ env:
 jobs:
   # Build cross-platform binaries and create prerelease
   build-binaries:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         include:
@@ -64,7 +64,7 @@ jobs:
   # Create GitHub prerelease with binaries
   create-prerelease:
     needs: build-binaries
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -86,138 +86,21 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Stage 1: Build per-arch beta images on native runners (no QEMU)
-  docker-images-build:
-    runs-on: ${{ matrix.platform.runs_on }}
-    strategy:
-      fail-fast: false
-      matrix:
-        variant:
-          - { name: latest, suffix: "",      enable_otel: "false", enable_embedui: "true", enable_python: "true", enable_full_skills: "false" }
-          - { name: full,   suffix: "-full", enable_otel: "false", enable_embedui: "true", enable_python: "true", enable_full_skills: "true"  }
-        platform:
-          - { name: "linux/amd64", runs_on: ubuntu-latest,    arch: amd64 }
-          - { name: "linux/arm64", runs_on: ubuntu-24.04-arm, arch: arm64 }
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: |
-            ${{ env.GHCR_IMAGE }}
-            ${{ env.DOCKERHUB_IMAGE }}
-
-      - name: Build and push by digest
-        id: build
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          platforms: ${{ matrix.platform.name }}
-          outputs: type=image,"name=${{ env.GHCR_IMAGE }},${{ env.DOCKERHUB_IMAGE }}",push-by-digest=true,name-canonical=true,push=true
-          labels: ${{ steps.meta.outputs.labels }}
-          build-args: |
-            ENABLE_OTEL=${{ matrix.variant.enable_otel }}
-            ENABLE_EMBEDUI=${{ matrix.variant.enable_embedui }}
-            ENABLE_PYTHON=${{ matrix.variant.enable_python }}
-            ENABLE_FULL_SKILLS=${{ matrix.variant.enable_full_skills }}
-            VERSION=${{ github.ref_name }}
-          cache-from: type=gha,scope=beta-${{ matrix.variant.name }}-${{ matrix.platform.arch }}
-          cache-to: type=gha,mode=max,scope=beta-${{ matrix.variant.name }}-${{ matrix.platform.arch }}
-
-      - name: Export digest
-        run: |
-          mkdir -p /tmp/digests
-          digest="${{ steps.build.outputs.digest }}"
-          touch "/tmp/digests/${digest#sha256:}"
-
-      - name: Upload digest artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: digest-${{ matrix.variant.name }}-${{ matrix.platform.arch }}
-          path: /tmp/digests/*
-          if-no-files-found: error
-          retention-days: 1
-
-  # Stage 2: Merge per-arch digests into multi-arch manifests per variant
-  docker-images-merge:
-    needs: docker-images-build
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        variant:
-          - { name: latest, suffix: ""      }
-          - { name: full,   suffix: "-full" }
-    steps:
-      - uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Download digests
-        uses: actions/download-artifact@v4
-        with:
-          pattern: digest-${{ matrix.variant.name }}-*
-          path: /tmp/digests
-          merge-multiple: true
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: |
-            ${{ env.GHCR_IMAGE }}
-            ${{ env.DOCKERHUB_IMAGE }}
-          tags: |
-            type=raw,value=${{ github.ref_name }},suffix=${{ matrix.variant.suffix }}
-            type=raw,value=beta,enable=${{ matrix.variant.suffix == '' }},suffix=
-            type=raw,value=beta${{ matrix.variant.suffix }},enable=${{ matrix.variant.suffix != '' }}
-
-      - name: Create and push multi-arch manifest (GHCR)
-        run: |
-          cd /tmp/digests
-          DIGESTS=$(printf "${{ env.GHCR_IMAGE }}@sha256:%s " *)
-          docker buildx imagetools create \
-            $(jq -cr '.tags | map(select(startswith("ghcr.io")) | "-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $DIGESTS
-
-      - name: Create and push multi-arch manifest (Docker Hub)
-        run: |
-          cd /tmp/digests
-          DIGESTS=$(printf "${{ env.GHCR_IMAGE }}@sha256:%s " *)
-          docker buildx imagetools create \
-            $(jq -cr '.tags | map(select(startswith("digitop/")) | "-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $DIGESTS
-
-      - name: Inspect manifests
-        run: |
-          for tag in $(jq -r '.tags[]' <<< "$DOCKER_METADATA_OUTPUT_JSON"); do
-            docker buildx imagetools inspect "$tag"
-          done
+  # Docker beta images: 2 variants on both registries, multi-arch
+  docker-images:
+    uses: ./.github/workflows/docker-multiarch.yaml
+    with:
+      variants-json: >-
+        [
+          {"name":"latest","suffix":"","enable_otel":"false","enable_embedui":"true","enable_python":"true","enable_full_skills":"false"},
+          {"name":"full","suffix":"-full","enable_otel":"false","enable_embedui":"true","enable_python":"true","enable_full_skills":"true"}
+        ]
+      tag-rules: |
+        type=raw,value=${{ github.ref_name }},suffix=${{ matrix.variant.suffix }}
+        type=raw,value=beta,enable=${{ matrix.variant.suffix == '' }},suffix=
+        type=raw,value=beta${{ matrix.variant.suffix }},enable=${{ matrix.variant.suffix != '' }}
+      cache-prefix: beta
+      version: ${{ github.ref_name }}
+    secrets:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
