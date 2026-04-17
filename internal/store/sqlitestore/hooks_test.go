@@ -176,6 +176,22 @@ func TestSQLiteHookStore_TenantIsolation(t *testing.T) {
 		t.Fatalf("Create A: %v", err)
 	}
 
+	got, err := s.GetByID(ctxB, idA)
+	if err != nil {
+		t.Fatalf("GetByID B: %v", err)
+	}
+	if got != nil {
+		t.Errorf("tenant B saw tenant A hook %s in GetByID", idA)
+	}
+
+	gotMaster, err := s.GetByID(sqliteMasterCtx(), idA)
+	if err != nil {
+		t.Fatalf("GetByID master: %v", err)
+	}
+	if gotMaster == nil {
+		t.Fatal("master scope should see tenant A hook in GetByID")
+	}
+
 	// List from tenant B must not include tenant A's hook.
 	listB, err := s.List(ctxB, hooks.ListFilter{})
 	if err != nil {

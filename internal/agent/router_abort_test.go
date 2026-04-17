@@ -328,15 +328,19 @@ func TestAbortRun_StateAfterStop(t *testing.T) {
 
 	_, _ = registerRun(r, runID, sessionKey)
 
+	unregistered := make(chan struct{})
 	go func() {
 		time.Sleep(20 * time.Millisecond)
 		r.UnregisterRun(runID)
+		close(unregistered)
 	}()
 
 	res := r.AbortRun(runID, sessionKey)
 	if !res.Stopped {
 		t.Fatalf("expected Stopped=true, got %+v", res)
 	}
+
+	<-unregistered
 
 	// After stop the run entry should be gone from the map.
 	if _, ok := r.activeRuns.Load(runID); ok {

@@ -133,7 +133,8 @@ func (d *gatewayDeps) wireHTTPHandlersOnServer(
 		d.server.SetUsageHandler(httpapi.NewUsageHandler(d.pgStores.Snapshots, d.pgStores.DB))
 	}
 
-	// Runtime package management (install/uninstall system/pip/npm packages)
+	// Runtime package management (install/uninstall system/pip/npm/github packages)
+	initGitHubInstaller()
 	d.server.SetPackagesHandler(httpapi.NewPackagesHandler())
 
 	// API documentation (OpenAPI spec + Swagger UI at /docs)
@@ -253,7 +254,19 @@ func (d *gatewayDeps) wireHTTPHandlersOnServer(
 		if rl := d.server.RateLimiter(); rl != nil && rl.Enabled() {
 			ttsH.SetRateLimiter(rl.Allow)
 		}
+		// Wire stores for per-tenant TTS config lookup at synthesis time.
+		if d.pgStores.SystemConfigs != nil && d.pgStores.ConfigSecrets != nil {
+			ttsH.SetStores(d.pgStores.SystemConfigs, d.pgStores.ConfigSecrets)
+			// Wire tenant resolver for channels TTS auto-apply
+			d.audioMgr.SetTenantResolver(httpapi.NewTenantTTSResolver(d.pgStores.SystemConfigs, d.pgStores.ConfigSecrets))
+		}
 		d.server.SetTTSHandler(ttsH)
+		d.ttsHandler = ttsH // store for hot-reload
+	}
+
+	// Per-tenant TTS config endpoint — allows tenant admins to configure TTS.
+	if d.pgStores.SystemConfigs != nil && d.pgStores.ConfigSecrets != nil {
+		d.server.SetTTSConfigHandler(httpapi.NewTTSConfigHandler(d.pgStores.SystemConfigs, d.pgStores.ConfigSecrets))
 	}
 
 	// Seed + apply builtin tool disables

@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"sync/atomic"
 	"time"
 )
 
@@ -19,9 +20,10 @@ import (
 type pinnedIPKey struct{}
 
 // allowLoopbackForTest is a test-only bypass. Production code MUST never set
-// this variable. It is exported via SetAllowLoopbackForTest exclusively for
-// use in *_test.go files to permit httptest.NewServer addresses (127.0.0.1).
-var allowLoopbackForTest bool
+// this flag. Exposed via SetAllowLoopbackForTest exclusively for *_test.go.
+// atomic.Bool keeps read/write safe when tests spawn goroutines that trigger
+// outbound calls concurrently with the flag flip.
+var allowLoopbackForTest atomic.Bool
 
 // SetAllowLoopbackForTest enables or disables the loopback/private-CIDR bypass
 // for tests. Call with true before tests that use httptest.NewServer, and
@@ -30,7 +32,7 @@ var allowLoopbackForTest bool
 // This function MUST only be called from test code. Production paths never
 // set this flag — the zero value (false) is the safe default.
 func SetAllowLoopbackForTest(allow bool) {
-	allowLoopbackForTest = allow
+	allowLoopbackForTest.Store(allow)
 }
 
 // blockedCIDRs lists all CIDRs that must never be dialed.
@@ -95,7 +97,7 @@ func redactURL(rawURL string) string {
 // In test code, call SetAllowLoopbackForTest(true) before invoking this
 // function to permit httptest.NewServer addresses (127.0.0.1).
 func Validate(rawURL string) (*url.URL, net.IP, error) {
-	return validate(rawURL, allowLoopbackForTest)
+	return validate(rawURL, allowLoopbackForTest.Load())
 }
 
 // validate is the internal implementation; allowLoopback is set only in tests.
@@ -187,7 +189,7 @@ func NewSafeClient(timeout time.Duration) *http.Client {
 
 			// Defense-in-depth: re-check pinned IP against block list.
 			// allowLoopbackForTest bypasses this check in test code only.
-			if !allowLoopbackForTest && isBlocked(pinnedIP) {
+			if !allowLoopbackForTest.Load() && isBlocked(pinnedIP) {
 				return nil, fmt.Errorf("ssrf: pinned IP %s is in a blocked range", pinnedIP)
 			}
 

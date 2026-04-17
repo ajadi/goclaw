@@ -73,7 +73,12 @@ func init() {
 		MsgAlreadySummoning:      "agent đang được triệu hồi",
 		MsgSummoningUnavailable:  "triệu hồi không khả dụng",
 		MsgNoDescription:         "agent không có mô tả để triệu hồi lại",
+		MsgSummonCancelled:       "đã huỷ triệu hồi",
+		MsgCannotCancel:          "agent không trong trạng thái đang triệu hồi",
 		MsgInvalidPath:           "đường dẫn không hợp lệ",
+
+		// Tenant backup / restore
+		MsgRestoreNewModeRejectsTenantID: "mode=new tạo tenant mới; dùng tenant_slug (không phải tenant_id) làm slug cho tenant mới",
 
 		// Scheduler
 		MsgQueueFull:    "hàng đợi session đã đầy",

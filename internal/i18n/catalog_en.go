@@ -73,7 +73,12 @@ func init() {
 		MsgAlreadySummoning:      "agent is already being summoned",
 		MsgSummoningUnavailable:  "summoning not available",
 		MsgNoDescription:         "agent has no description to resummon from",
+		MsgSummonCancelled:       "summon cancelled by user",
+		MsgCannotCancel:          "agent is not being summoned",
 		MsgInvalidPath:           "invalid path",
+
+		// Tenant backup / restore
+		MsgRestoreNewModeRejectsTenantID: "mode=new creates a fresh tenant; pass tenant_slug (not tenant_id) as the new tenant's target slug",
 
 		// Scheduler
 		MsgQueueFull:    "session queue is full",

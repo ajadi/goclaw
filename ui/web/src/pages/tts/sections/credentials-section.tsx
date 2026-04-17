@@ -6,14 +6,14 @@
  */
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { FlaskConical } from "lucide-react";
+import { FlaskConical, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/stores/use-toast-store";
 import { getProviderDefinition } from "@/data/tts-providers";
-import type { TtsConfig, TtsProviderConfig, SynthesizeParams } from "../hooks/use-tts-config";
+import type { TtsConfig, TtsProviderConfig, TestConnectionParams, TestConnectionResult } from "../hooks/use-tts-config";
 
 interface Props {
   provider: string;
@@ -22,10 +22,13 @@ interface Props {
     providerKey: keyof Pick<TtsConfig, "openai" | "elevenlabs" | "edge" | "minimax">,
     patch: Partial<TtsProviderConfig>,
   ) => void;
-  synthesize: (params: SynthesizeParams) => Promise<Blob>;
+  testConnection: (params: TestConnectionParams) => Promise<TestConnectionResult>;
+  onSave: () => Promise<void>;
+  saving?: boolean;
+  dirty?: boolean;
 }
 
-export function CredentialsSection({ provider, draft, onUpdate, synthesize }: Props) {
+export function CredentialsSection({ provider, draft, onUpdate, testConnection, onSave, saving, dirty }: Props) {
   const { t } = useTranslation("tts");
   const [testing, setTesting] = useState(false);
 
@@ -36,8 +39,20 @@ export function CredentialsSection({ provider, draft, onUpdate, synthesize }: Pr
   const handleTestConnection = async () => {
     setTesting(true);
     try {
-      await synthesize({ text: "Hello, this is a connection test.", provider });
-      toast.success(t("testConnection.success", "Connection successful"));
+      // Build params from draft credentials — test with unsaved config
+      const cfg = draft[provider as keyof Pick<typeof draft, "openai" | "elevenlabs" | "minimax">];
+      // Don't send masked API key — backend will reject it
+      const apiKey = cfg?.api_key === "***" ? undefined : cfg?.api_key;
+      const params: TestConnectionParams = {
+        provider,
+        api_key: apiKey,
+        api_base: cfg?.api_base || cfg?.base_url,
+        voice_id: cfg?.voice_id || cfg?.voice,
+        model_id: cfg?.model_id || cfg?.model,
+        group_id: (cfg as { group_id?: string })?.group_id,
+      };
+      const result = await testConnection(params);
+      toast.success(t("testConnection.success", "Connection successful"), `${result.latency_ms}ms`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       toast.error(t("testConnection.failed", "Connection failed"), msg);
@@ -118,17 +133,29 @@ export function CredentialsSection({ provider, draft, onUpdate, synthesize }: Pr
           </>
         )}
 
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-9 gap-1.5"
-          disabled={testing}
-          onClick={handleTestConnection}
-        >
-          <FlaskConical className="h-3.5 w-3.5" />
-          {testing ? t("testConnection.testing", "Testing…") : t("testConnection.label", "Test connection")}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-9 gap-1.5"
+            disabled={testing}
+            onClick={handleTestConnection}
+          >
+            <FlaskConical className="h-3.5 w-3.5" />
+            {testing ? t("testConnection.testing", "Testing…") : t("testConnection.label", "Test connection")}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            className="h-9 gap-1.5"
+            disabled={saving || !dirty}
+            onClick={onSave}
+          >
+            <Save className="h-3.5 w-3.5" />
+            {saving ? t("saving") : t("save")}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
