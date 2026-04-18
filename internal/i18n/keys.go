@@ -220,8 +220,4 @@ const (
 	MsgHookBudgetExceeded           = "hook.budget_exceeded"            // "tenant hook token budget exceeded"
 	MsgHookPerTurnCapReached        = "hook.per_turn_cap_reached"       // "hook invocation per-turn cap reached"
 	MsgHookBuiltinReadOnly          = "hook.builtin_readonly"           // "builtin hooks are read-only except for the enabled toggle"
-
-	// --- Pancake private_reply ---
-	MsgPancakePrivateReplyWindowExpired = "error.pancake_private_reply_window_expired" // "Private reply rejected: comment older than 7 days (Meta policy)"
-	MsgPancakePrivateReplyDefault       = "pancake.private_reply_default"              // Fallback DM text when operator leaves PrivateReplyMessage blank
 )

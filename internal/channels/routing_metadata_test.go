@@ -39,16 +39,13 @@ func TestCopyFinalRoutingMeta_PreservesPlaceholderAndPancakeMode(t *testing.T) {
 }
 
 // TestCopyRoutingMeta_PreservesPancakePrivateReplyKeys verifies the metadata
-// keys added for the private_reply funnel survive inbound→outbound copy.
-// Without this, the new mode switch + scope filter silently break end-to-end
-// (unit tests calling Send() directly would still pass — false confidence).
+// keys used by the private_reply DM (post_id, display_name, sender_id)
+// survive inbound→outbound copy.
 func TestCopyRoutingMeta_PreservesPancakePrivateReplyKeys(t *testing.T) {
 	src := map[string]string{
-		"private_reply_mode": "standalone",
-		"private_reply_only": "true",
-		"post_id":            "post-42",
-		"display_name":       "Tuấn",
-		"sender_id":          "user-1",
+		"post_id":      "post-42",
+		"display_name": "Tuấn",
+		"sender_id":    "user-1",
 	}
 
 	got := copyRoutingMeta(src)
@@ -58,7 +55,6 @@ func TestCopyRoutingMeta_PreservesPancakePrivateReplyKeys(t *testing.T) {
 		}
 	}
 
-	// Also survive the final-outbound hop.
 	final := CopyFinalRoutingMeta(src)
 	for k, want := range src {
 		if final[k] != want {

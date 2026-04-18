@@ -2,14 +2,10 @@ package cmd
 
 import (
 	"context"
-	"crypto/subtle"
 	"log/slog"
-	"net/http"
 	"os"
 	"strings"
 	"time"
-
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/nextlevelbuilder/goclaw/internal/bus"
 	"github.com/nextlevelbuilder/goclaw/internal/cache"
@@ -17,7 +13,6 @@ import (
 	"github.com/nextlevelbuilder/goclaw/internal/config"
 	"github.com/nextlevelbuilder/goclaw/internal/edition"
 	"github.com/nextlevelbuilder/goclaw/internal/heartbeat"
-	_ "github.com/nextlevelbuilder/goclaw/internal/metrics" // register counters on default registry
 	"github.com/nextlevelbuilder/goclaw/internal/sandbox"
 	"github.com/nextlevelbuilder/goclaw/internal/scheduler"
 	"github.com/nextlevelbuilder/goclaw/internal/store"
@@ -25,28 +20,6 @@ import (
 	"github.com/nextlevelbuilder/goclaw/internal/tools"
 	"github.com/nextlevelbuilder/goclaw/pkg/protocol"
 )
-
-// metricsAuthHandler gates promhttp with Bearer auth when Gateway.Token is
-// configured. Prometheus scrape labels include page_id — leaking them (+ send
-// volumes) to an unauthenticated /metrics endpoint on a 0.0.0.0 bind would
-// expose PII-adjacent identifiers. When no token is configured (dev mode),
-// falls through unauthenticated to preserve local scraping workflows.
-func metricsAuthHandler(token string) http.Handler {
-	h := promhttp.Handler()
-	if token == "" {
-		return h
-	}
-	tokenBytes := []byte(token)
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		auth := r.Header.Get("Authorization")
-		provided := strings.TrimPrefix(auth, "Bearer ")
-		if !strings.HasPrefix(auth, "Bearer ") || subtle.ConstantTimeCompare([]byte(provided), tokenBytes) != 1 {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
-			return
-		}
-		h.ServeHTTP(w, r)
-	})
-}
 
 // lifecycleDeps bundles the extra parameters needed by runLifecycle that are not in gatewayDeps.
 type lifecycleDeps struct {
@@ -234,16 +207,6 @@ func (d *gatewayDeps) runLifecycle(
 		mux.Handle(route.Path, route.Handler)
 		slog.Info("webhook route mounted on gateway", "path", route.Path)
 	}
-
-	// Prometheus /metrics — uses the default registry where internal/metrics
-	// counters self-register via promauto. Counters have low cardinality (page_id
-	// is the only dynamic label), so a scrape should stay well under 1 KB.
-	// Gated by Bearer token when configured; open when not (dev/local scraping).
-	mux.Handle("GET /metrics", metricsAuthHandler(d.cfg.Gateway.Token))
-	if d.cfg.Gateway.Token == "" {
-		slog.Warn("security.metrics_unauthenticated: /metrics exposed without gateway token — bind GOCLAW_HOST=127.0.0.1 or set gateway.token to avoid leaking labels")
-	}
-	slog.Info("metrics endpoint mounted on gateway", "path", "/metrics", "auth", d.cfg.Gateway.Token != "")
 
 	tsCleanup := initTailscale(ctx, d.cfg, mux)
 	if tsCleanup != nil {

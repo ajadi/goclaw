@@ -52,37 +52,23 @@ describe("pancake configSchema", () => {
     });
   });
 
-  it("private_reply_mode has exactly after_reply + standalone options", () => {
-    const mode = pancakeConfig.find((f) => f.key === "private_reply_mode")!;
-    expect(mode.type).toBe("select");
-    expect(mode.defaultValue).toBe("after_reply");
-    const values = mode.options!.map((o) => o.value);
-    expect(values).toEqual(["after_reply", "standalone"]);
+  it("exposes private_reply_message gated by the feature toggle", () => {
+    const msg = pancakeConfig.find((f) => f.key === "private_reply_message");
+    expect(msg).toBeDefined();
+    expect(msg!.type).toBe("textarea");
+    expect(msg!.showWhen).toEqual({ key: "features.private_reply", value: "true" });
   });
 
-  it("private_reply fields are gated by features.private_reply", () => {
-    const gated = [
+  it("does NOT expose removed private_reply config fields", () => {
+    const removed = [
       "private_reply_mode",
-      "private_reply_message",
+      "private_reply_only",
       "private_reply_ttl_days",
       "private_reply_options.allow_post_ids",
       "private_reply_options.deny_post_ids",
     ];
-    for (const key of gated) {
-      const f = pancakeConfig.find((x) => x.key === key);
-      expect(f, `missing field ${key}`).toBeDefined();
-      expect(f!.showWhen).toEqual({ key: "features.private_reply", value: "true" });
+    for (const key of removed) {
+      expect(pancakeConfig.find((f) => f.key === key), `field ${key} should be removed`).toBeUndefined();
     }
-  });
-
-  it("private_reply_options.allow_post_ids is a tags field", () => {
-    const allow = pancakeConfig.find((f) => f.key === "private_reply_options.allow_post_ids")!;
-    expect(allow.type).toBe("tags");
-  });
-
-  it("private_reply_ttl_days defaults to 7", () => {
-    const ttl = pancakeConfig.find((f) => f.key === "private_reply_ttl_days")!;
-    expect(ttl.type).toBe("number");
-    expect(ttl.defaultValue).toBe(7);
   });
 });

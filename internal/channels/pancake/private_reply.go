@@ -1,50 +1,18 @@
 package pancake
 
-import (
-	"strings"
-	"time"
+import "strings"
 
-	"github.com/nextlevelbuilder/goclaw/internal/i18n"
-)
+// defaultPrivateReplyMsg is the English fallback when PrivateReplyMessage is
+// empty. Not localized by design — sellers set their own wording in config.
+const defaultPrivateReplyMsg = "Thanks for your comment! We'll DM you shortly."
 
-// defaultPrivateReplyTTL is the fallback TTL when PrivateReplyTTLDays is 0.
-const defaultPrivateReplyTTL = 7 * 24 * time.Hour
-
-// defaultPrivateReplyMessage returns the built-in DM fallback for the given
-// locale. Resolves via internal/i18n (MsgPancakePrivateReplyDefault), which
-// falls back to English when the locale catalog lacks the key.
-func defaultPrivateReplyMessage(locale string) string {
-	return i18n.T(locale, i18n.MsgPancakePrivateReplyDefault)
-}
-
-// resolvePrivateReplyTTL returns the configured TTL. Non-positive values fall
-// back to the 7-day default (garbage-in-safe).
-func resolvePrivateReplyTTL(cfg *pancakeInstanceConfig) time.Duration {
-	if cfg == nil || cfg.PrivateReplyTTLDays <= 0 {
-		return defaultPrivateReplyTTL
-	}
-	return time.Duration(cfg.PrivateReplyTTLDays) * 24 * time.Hour
-}
-
-// resolvePrivateReplyMode maps config values to a canonical mode string.
-// Valid: "after_reply" (default), "standalone". Anything else — including the
-// dropped "both" — falls back to "after_reply".
-func resolvePrivateReplyMode(cfg *pancakeInstanceConfig) string {
-	if cfg != nil && cfg.PrivateReplyMode == "standalone" {
-		return "standalone"
-	}
-	return "after_reply"
-}
-
-// renderPrivateReplyMessage substitutes {{key}} placeholders with vars values.
-// Pre-sanitizes values (strips "{{" and "}}") so a var value cannot inject
-// another placeholder regardless of Go map iteration order.
-// Empty tmpl uses the locale-appropriate default via i18n (English fallback
-// when catalog missing the key).
-// Unknown placeholders are left as-is (seller-friendly, not a hard error).
-func renderPrivateReplyMessage(tmpl, locale string, vars map[string]string) string {
+// renderPrivateReplyMessage substitutes {{key}} placeholders in tmpl with vars
+// values. Pre-sanitizes values (strips "{{" and "}}") so a value cannot inject
+// another placeholder. Empty tmpl falls back to defaultPrivateReplyMsg.
+// Unknown placeholders are left as-is.
+func renderPrivateReplyMessage(tmpl string, vars map[string]string) string {
 	if tmpl == "" {
-		tmpl = defaultPrivateReplyMessage(locale)
+		tmpl = defaultPrivateReplyMsg
 	}
 	out := tmpl
 	for k, v := range vars {
@@ -53,34 +21,4 @@ func renderPrivateReplyMessage(tmpl, locale string, vars map[string]string) stri
 		out = strings.ReplaceAll(out, "{{"+k+"}}", safe)
 	}
 	return out
-}
-
-// filterPrivateReply returns true when the post passes the configured scope
-// filters. Nil opts = allow all. Deny beats allow. Empty postID = deny
-// (scope filtering requires a known post).
-func filterPrivateReply(opts *PrivateReplyOptions, postID string) bool {
-	if opts == nil || (len(opts.AllowPostIDs) == 0 && len(opts.DenyPostIDs) == 0) {
-		return true
-	}
-	if postID == "" {
-		return false
-	}
-	if containsPostID(opts.DenyPostIDs, postID) {
-		return false
-	}
-	if len(opts.AllowPostIDs) > 0 && !containsPostID(opts.AllowPostIDs, postID) {
-		return false
-	}
-	return true
-}
-
-// containsPostID reports whether target matches any entry in list, trimming
-// whitespace on each entry so operators can paste comma-separated UI values.
-func containsPostID(list []string, target string) bool {
-	for _, item := range list {
-		if strings.TrimSpace(item) == target {
-			return true
-		}
-	}
-	return false
 }

@@ -320,27 +320,11 @@
     "platform": { "label": "Platform", "help": "Select the platform this Pancake page serves." },
     "features.private_reply": {
       "label": "Private Reply (Comment → DM)",
-      "help": "Send a private DM to commenters. Facebook/Instagram only. DM must be sent within 7 days of the comment (Meta policy)."
-    },
-    "private_reply_mode": {
-      "label": "DM Mode",
-      "help": "Standalone bypasses the comment keyword filter — DM runs on every valid commenter."
+      "help": "Send a one-time DM to commenters after the public reply. Facebook/Instagram only. Meta allows DM within 7 days of the comment."
     },
     "private_reply_message": {
       "label": "DM Message",
-      "help": "Supports the placeholders commenter_name and post_title. Empty = default text."
-    },
-    "private_reply_ttl_days": {
-      "label": "Re-DM After (days)",
-      "help": "Days before the same commenter can receive the auto-DM again. Default 7."
-    },
-    "private_reply_options.allow_post_ids": {
-      "label": "Allow Post IDs",
-      "help": "Only DM on these post IDs. Empty = all posts."
-    },
-    "private_reply_options.deny_post_ids": {
-      "label": "Deny Post IDs",
-      "help": "Skip DM on these post IDs."
+      "help": "Supports the placeholders commenter_name and post_title. Empty = default English text."
     }
   },
   "fieldOptions": {
@@ -399,10 +383,6 @@
       "chat_plugin": "Chat Plugin",
       "lazada":      "Lazada",
       "tokopedia":   "Tokopedia"
-    },
-    "private_reply_mode": {
-      "after_reply": "After public reply (default)",
-      "standalone":  "DM only (no public reply)"
     }
   },
   "groupOverrides": {

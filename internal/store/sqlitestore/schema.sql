@@ -1662,20 +1662,3 @@ CREATE TABLE IF NOT EXISTS tenant_hook_budget (
     updated_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 
--- ============================================================
--- Table: pancake_private_reply_sent (migration 000056, SQLite v25)
--- Tracks one-time DM sent per (tenant, page, sender) so the Pancake
--- channel dedup survives restarts. TTL enforced caller-side based on
--- private_reply_ttl_days config.
--- ============================================================
-
-CREATE TABLE IF NOT EXISTS pancake_private_reply_sent (
-    tenant_id   TEXT NOT NULL,
-    page_id     TEXT NOT NULL,
-    sender_id   TEXT NOT NULL,
-    sent_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-    PRIMARY KEY (tenant_id, page_id, sender_id),
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
-);
-
-CREATE INDEX IF NOT EXISTS idx_pancake_private_reply_sent_at ON pancake_private_reply_sent (sent_at);

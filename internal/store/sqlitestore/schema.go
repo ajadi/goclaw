@@ -16,7 +16,7 @@ var schemaSQL string
 
 // SchemaVersion is the current SQLite schema version.
 // Bump this when adding new migration steps below.
-const SchemaVersion = 25
+const SchemaVersion = 24
 
 // migrations maps version → SQL to apply when upgrading FROM that version.
 // schema.sql always represents the LATEST full schema (for fresh DBs).
@@ -496,19 +496,6 @@ CREATE TRIGGER IF NOT EXISTS trg_vault_docs_scope_consistency_upd
   BEGIN
     SELECT RAISE(ABORT, 'vault_documents_scope_consistency violation');
   END;`,
-
-	// Version 24 → 25: pancake_private_reply_sent dedup table.
-	// Mirrors PG migration 000056. Tracks one-time DM per (tenant,page,sender)
-	// so Pancake channel dedup survives restarts. TTL enforced caller-side.
-	24: `CREATE TABLE IF NOT EXISTS pancake_private_reply_sent (
-    tenant_id   TEXT NOT NULL,
-    page_id     TEXT NOT NULL,
-    sender_id   TEXT NOT NULL,
-    sent_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-    PRIMARY KEY (tenant_id, page_id, sender_id),
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
-);
-CREATE INDEX IF NOT EXISTS idx_pancake_private_reply_sent_at ON pancake_private_reply_sent (sent_at);`,
 }
 
 // addHooksTables is the SQLite incremental migration for schema v19 → v20.

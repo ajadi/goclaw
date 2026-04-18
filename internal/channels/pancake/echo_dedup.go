@@ -120,8 +120,6 @@ func normalizeEchoContent(content string) string {
 }
 
 // runDedupCleaner evicts dedup entries older than dedupTTL every dedupCleanEvery.
-// The private-reply dedup lives in the PancakePrivateReplyStore (DB-backed),
-// so no longer participates in this in-memory eviction loop.
 func (ch *Channel) runDedupCleaner() {
 	ticker := time.NewTicker(dedupCleanEvery)
 	defer ticker.Stop()

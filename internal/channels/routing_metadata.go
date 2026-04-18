@@ -14,9 +14,7 @@ var routingMetaKeys = []string{
 	"page_id",                // facebook page routing
 	"reply_to_comment_id",    // facebook/pancake comment reply target
 	"pancake_mode",           // pancake inbox vs comment routing
-	"private_reply_mode",     // pancake private_reply mode: after_reply | standalone
-	"private_reply_only",     // pancake: "true" when standalone mode skips public reply
-	"post_id",                // pancake: post id for scope filter + template vars
+	"post_id",                // pancake: post id for template vars
 	"display_name",           // pancake: commenter display name for template vars
 }
 

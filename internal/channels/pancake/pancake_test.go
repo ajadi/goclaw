@@ -680,17 +680,6 @@ func (t *multiCaptureTransport) RoundTrip(req *http.Request) (*http.Response, er
 
 func newChannelWithMultiCapture(t *testing.T, cfg pancakeInstanceConfig) (*Channel, *multiCaptureTransport) {
 	t.Helper()
-	ch, transport, _ := newChannelWithMultiCaptureAndStore(t, cfg)
-	return ch, transport
-}
-
-// newChannelWithMultiCaptureAndStore returns a Channel wired with a fake
-// PancakePrivateReplyStore. Use this variant in tests that need to assert
-// store-level behaviour (dedup, mark calls, error injection).
-// The fake skips tenant-context checks so legacy tests that don't seed
-// store.WithTenantID keep working (see H5 note in plan phase 4).
-func newChannelWithMultiCaptureAndStore(t *testing.T, cfg pancakeInstanceConfig) (*Channel, *multiCaptureTransport, *fakePrivateReplyStore) {
-	t.Helper()
 	transport := &multiCaptureTransport{}
 	msgBus := bus.New()
 	cfg.PageID = "page-123"
@@ -701,10 +690,7 @@ func newChannelWithMultiCaptureAndStore(t *testing.T, cfg pancakeInstanceConfig)
 	}
 	ch.apiClient.httpClient = &http.Client{Transport: transport}
 	ch.platform = "facebook"
-	fake := newFakePrivateReplyStore()
-	fake.SkipTenantCheck = true
-	ch.privateReplyStore = fake
-	return ch, transport, fake
+	return ch, transport
 }
 
 func TestSend_CommentMode(t *testing.T) {
@@ -797,7 +783,10 @@ func TestSend_CommentMode_WithPrivateReply(t *testing.T) {
 	}
 }
 
-func TestSend_CommentMode_PrivateReplyDedup(t *testing.T) {
+func TestSend_CommentMode_PrivateReplyStateless(t *testing.T) {
+	// Stateless: each Send() with PrivateReply enabled fires a DM.
+	// Dedup responsibility lives at the webhook layer (comment_id) and
+	// at Facebook's platform (per-comment private_replies idempotency).
 	cfg := pancakeInstanceConfig{}
 	cfg.Features.PrivateReply = true
 	cfg.PrivateReplyMessage = "DM!"
@@ -812,33 +801,27 @@ func TestSend_CommentMode_PrivateReplyDedup(t *testing.T) {
 			"reply_to_comment_id": "msg-1",
 		},
 	}
-	ch.Send(context.Background(), outMsg)  //nolint:errcheck
-	outMsg.ChatID = "conv-456"             // second comment, different conv, same sender
+	ch.Send(context.Background(), outMsg) //nolint:errcheck
+	outMsg.ChatID = "conv-456"
 	outMsg.Metadata["reply_to_comment_id"] = "msg-2"
-	ch.Send(context.Background(), outMsg)  //nolint:errcheck
+	ch.Send(context.Background(), outMsg) //nolint:errcheck
 
 	transport.mu.Lock()
 	defer transport.mu.Unlock()
-	// Expected: reply_comment x2, private_reply x1 (deduped on sender)
-	if len(transport.reqs) != 3 {
-		t.Fatalf("expected 3 requests (2x reply_comment + 1x private_reply), got %d", len(transport.reqs))
+	// 2x reply_comment + 2x private_reply = 4 requests (stateless)
+	if len(transport.reqs) != 4 {
+		t.Fatalf("expected 4 requests (2x reply_comment + 2x private_reply, stateless), got %d", len(transport.reqs))
 	}
-	var actions []string
+	var privateCount int
 	for _, body := range transport.bodies {
 		var p map[string]any
 		json.Unmarshal(body, &p)
-		if a, ok := p["action"].(string); ok {
-			actions = append(actions, a)
-		}
-	}
-	privateCount := 0
-	for _, a := range actions {
-		if a == "private_reply" {
+		if p["action"] == "private_reply" {
 			privateCount++
 		}
 	}
-	if privateCount != 1 {
-		t.Errorf("expected exactly 1 private_reply, got %d (actions: %v)", privateCount, actions)
+	if privateCount != 2 {
+		t.Errorf("expected 2 private_reply calls (stateless), got %d", privateCount)
 	}
 }
 
@@ -918,7 +901,7 @@ func TestSendPrivateReply_DefaultMessage(t *testing.T) {
 	cfg := pancakeInstanceConfig{}
 	cfg.Features.PrivateReply = true
 	cfg.PrivateReplyMessage = "" // empty = use default
-	ch, transport, _ := newChannelWithMultiCaptureAndStore(t, cfg)
+	ch, transport := newChannelWithMultiCapture(t, cfg)
 
 	ch.sendPrivateReply(context.Background(), "user-1", "conv-123", "", "")
 
@@ -942,7 +925,7 @@ func TestSendPrivateReply_CustomMessage(t *testing.T) {
 	cfg := pancakeInstanceConfig{}
 	cfg.Features.PrivateReply = true
 	cfg.PrivateReplyMessage = "Thanks for your comment!"
-	ch, transport, _ := newChannelWithMultiCaptureAndStore(t, cfg)
+	ch, transport := newChannelWithMultiCapture(t, cfg)
 
 	ch.sendPrivateReply(context.Background(), "user-1", "conv-123", "", "")
 
@@ -958,9 +941,9 @@ func TestSendPrivateReply_CustomMessage(t *testing.T) {
 	}
 }
 
-func TestSendPrivateReply_APIErrorReleasesClaim(t *testing.T) {
-	// Claim-first semantics: TryClaim marks the slot, then on API failure
-	// Unclaim releases it so the next comment from the same sender can retry.
+func TestSendPrivateReply_APIErrorLoggedAndNonBlocking(t *testing.T) {
+	// Stateless: API errors are logged (warn) but do not prevent subsequent
+	// sends. No state to release. Second call still attempts the API.
 	errorTransport := &captureTransport{
 		resp: &http.Response{
 			StatusCode: http.StatusInternalServerError,
@@ -976,25 +959,18 @@ func TestSendPrivateReply_APIErrorReleasesClaim(t *testing.T) {
 	creds := pancakeCreds{APIKey: "k", PageAccessToken: "t"}
 	ch, _ := New(cfg, creds, msgBus, nil)
 	ch.apiClient.httpClient = &http.Client{Transport: errorTransport}
-	fake := newFakePrivateReplyStore()
-	fake.SkipTenantCheck = true
-	ch.privateReplyStore = fake
 
 	ch.sendPrivateReply(context.Background(), "user-1", "conv-123", "", "")
-
-	if fake.tryClaimCalls != 1 {
-		t.Errorf("TryClaim calls = %d; want 1", fake.tryClaimCalls)
-	}
-	if fake.unclaimCalls != 1 {
-		t.Errorf("Unclaim calls = %d; want 1 (must release claim on API failure)", fake.unclaimCalls)
+	if errorTransport.req == nil {
+		t.Fatal("expected first API call to be attempted even when it errors")
 	}
 
-	// Second call: should attempt again (dedup store says not sent).
+	// Second call: still attempts the API — stateless behaviour.
 	secondTransport := &captureTransport{}
 	ch.apiClient.httpClient = &http.Client{Transport: secondTransport}
 	ch.sendPrivateReply(context.Background(), "user-1", "conv-123", "", "")
 	if secondTransport.req == nil {
-		t.Error("expected retry request after previous failure")
+		t.Error("expected retry request after previous failure (stateless, no per-sender dedup)")
 	}
 }
 
@@ -1042,9 +1018,6 @@ func TestCommentFlowEndToEnd(t *testing.T) {
 	}
 	ch.apiClient.httpClient = &http.Client{Transport: transport}
 	ch.platform = "facebook"
-	fake := newFakePrivateReplyStore()
-	fake.SkipTenantCheck = true
-	ch.privateReplyStore = fake
 
 	router := &webhookRouter{instances: map[string]*Channel{"page-e2e": ch}}
 
@@ -1103,7 +1076,7 @@ func TestCommentFlowEndToEnd(t *testing.T) {
 		t.Errorf("second action = %q, want private_reply", actions[1])
 	}
 
-	// Step 6: Second comment from same sender — no second DM.
+	// Step 6: Second comment from same sender — stateless: another DM fires.
 	body2 := buildWebhookBody("page-e2e", "conv-e2e", "COMMENT", "user-e2e", "msg-e2e-2", "another comment", "")
 	req2 := httptest.NewRequest(http.MethodPost, webhookPath, strings.NewReader(body2))
 	w2 := httptest.NewRecorder()
@@ -1116,8 +1089,8 @@ func TestCommentFlowEndToEnd(t *testing.T) {
 		t.Fatal("expected second inbound message")
 	}
 	outMsg2 := bus.OutboundMessage{
-		ChatID:  inMsg2.ChatID,
-		Content: "thanks again",
+		ChatID:   inMsg2.ChatID,
+		Content:  "thanks again",
 		Metadata: inMsg2.Metadata,
 	}
 	ch.Send(context.Background(), outMsg2) //nolint:errcheck
@@ -1126,8 +1099,9 @@ func TestCommentFlowEndToEnd(t *testing.T) {
 	finalCount := len(transport.reqs)
 	transport.mu.Unlock()
 
-	// 2 (first round) + 1 (second reply_comment only, no second private_reply)
-	if finalCount != 3 {
-		t.Errorf("expected 3 total requests after dedup, got %d", finalCount)
+	// 2 (first round: reply_comment + private_reply) + 2 (second: reply_comment + private_reply)
+	// Stateless — no per-sender dedup. FB's per-comment idempotency handles duplicates platform-side.
+	if finalCount != 4 {
+		t.Errorf("expected 4 total requests (stateless: 2 rounds × (reply + DM)), got %d", finalCount)
 	}
 }

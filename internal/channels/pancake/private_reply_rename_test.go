@@ -8,13 +8,14 @@ import (
 	"github.com/nextlevelbuilder/goclaw/internal/bus"
 )
 
-// TestPrivateReplyRename_BehaviorPreserved is a characterization test that pins
-// the one-time DM dedup behavior across the Phase 1 mechanical rename
-// (first_inbox → private_reply). Same behavior, new names.
-func TestPrivateReplyRename_BehaviorPreserved(t *testing.T) {
+// TestPrivateReply_StatelessFiresEveryCall verifies private_reply fires on
+// every Send() when Features.PrivateReply is enabled. Stateless design: no
+// GoClaw-side dedup. Webhook-level comment_id dedup + FB per-comment
+// idempotency handle duplicates; sender-level dedup intentionally removed.
+func TestPrivateReply_StatelessFiresEveryCall(t *testing.T) {
 	cfg := pancakeInstanceConfig{}
 	cfg.Features.PrivateReply = true
-	cfg.PrivateReplyMessage = "Hi {name}"
+	cfg.PrivateReplyMessage = "Hi {{commenter_name}}"
 	ch, transport := newChannelWithMultiCapture(t, cfg)
 
 	outMsg := bus.OutboundMessage{
@@ -24,15 +25,14 @@ func TestPrivateReplyRename_BehaviorPreserved(t *testing.T) {
 			"pancake_mode":        "comment",
 			"sender_id":           "user-1",
 			"reply_to_comment_id": "comment-1",
+			"display_name":        "Tuan",
 		},
 	}
 
-	// First send: public reply + private_reply (DM).
 	if err := ch.Send(context.Background(), outMsg); err != nil {
 		t.Fatalf("first Send: %v", err)
 	}
 
-	// Second send: same sender → DM must be deduped (no second private_reply).
 	outMsg.ChatID = "conv-2"
 	outMsg.Metadata["reply_to_comment_id"] = "comment-2"
 	if err := ch.Send(context.Background(), outMsg); err != nil {
@@ -43,7 +43,7 @@ func TestPrivateReplyRename_BehaviorPreserved(t *testing.T) {
 	defer transport.mu.Unlock()
 
 	var privateReplyCount int
-	var privateReplyBody string
+	var lastBody string
 	for _, body := range transport.bodies {
 		var p map[string]any
 		if err := json.Unmarshal(body, &p); err != nil {
@@ -52,17 +52,15 @@ func TestPrivateReplyRename_BehaviorPreserved(t *testing.T) {
 		if p["action"] == "private_reply" {
 			privateReplyCount++
 			if msg, _ := p["message"].(string); msg != "" {
-				privateReplyBody = msg
+				lastBody = msg
 			}
 		}
 	}
 
-	if privateReplyCount != 1 {
-		t.Errorf("expected exactly 1 private_reply call (dedup per sender), got %d", privateReplyCount)
+	if privateReplyCount != 2 {
+		t.Errorf("expected 2 private_reply calls (stateless, one per comment), got %d", privateReplyCount)
 	}
-	// P3 introduces template rendering. P1 pins literal passthrough: "{name}" stays as-is.
-	if privateReplyBody != "Hi {name}" {
-		t.Errorf("private_reply body = %q, want %q (no template processing at P1)",
-			privateReplyBody, "Hi {name}")
+	if lastBody != "Hi Tuan" {
+		t.Errorf("private_reply body = %q, want %q (template should render)", lastBody, "Hi Tuan")
 	}
 }

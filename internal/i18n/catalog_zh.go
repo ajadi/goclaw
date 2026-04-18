@@ -216,8 +216,5 @@ func init() {
 		MsgHookBudgetExceeded:          "租户钩子令牌预算已耗尽",
 		MsgHookPerTurnCapReached:       "单轮钩子调用次数已达上限",
 		MsgHookBuiltinReadOnly:         "内置钩子只读,仅允许切换启用状态",
-
-		MsgPancakePrivateReplyWindowExpired: "私信发送失败：评论已超过 7 天(Meta 政策限制)",
-		MsgPancakePrivateReplyDefault:       "感谢您的评论！我们将通过私信继续协助您。",
 	})
 }
