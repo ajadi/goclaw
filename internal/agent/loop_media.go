@@ -107,6 +107,11 @@ func extractMediaFromContent(content, workspace string) []MediaResult {
 		// Resolve ancestor symlinks THEN check containment. A purely lexical
 		// Rel check would pass "<ws>/<symlink-dir>/secret" when symlink-dir
 		// points outside the workspace; EvalSymlinks closes that escape.
+		// NOTE: resolved is used ONLY for containment — the stored path stays
+		// `cleaned` so downstream readers (channel senders, history) use the
+		// same path semantics as the tool that wrote the file. Overwriting
+		// with the resolved path caused dedup misses in production when
+		// workspace contains bind-mounts / dir symlinks.
 		resolved, err := filepath.EvalSymlinks(cleaned)
 		if err != nil {
 			continue
@@ -115,7 +120,6 @@ func extractMediaFromContent(content, workspace string) []MediaResult {
 		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 			continue
 		}
-		cleaned = resolved
 		if _, dup := seen[cleaned]; dup {
 			continue
 		}
@@ -128,12 +132,12 @@ func extractMediaFromContent(content, workspace string) []MediaResult {
 	return results
 }
 
-// deduplicateMedia removes duplicate media results, normalizing each path
-// so legacy entries from parseMediaResult (raw tool output — may contain
-// "./" segments or relative forms) collapse cleanly with entries from
-// extractMediaFromContent (already Clean'd + Abs'd). Prevents double-send
-// when a tool returns MEDIA:./x.mp3 and the LLM echoes it back in a form
-// that resolves to the same file.
+// deduplicateMedia removes duplicate media results by path, keeping the first
+// occurrence. Exact-string match is the ONLY safe comparison: filepath.Abs
+// normalization depends on the process CWD, which varies across deployment
+// environments and was observed to drop legitimate entries in production.
+// The tiny cost of an occasional aliased-path duplicate (e.g. "./x" vs "/abs/x")
+// is preferable to silently eating a real attachment.
 func deduplicateMedia(media []MediaResult) []MediaResult {
 	if len(media) <= 1 {
 		return media
@@ -141,16 +145,10 @@ func deduplicateMedia(media []MediaResult) []MediaResult {
 	seen := make(map[string]bool, len(media))
 	result := make([]MediaResult, 0, len(media))
 	for _, m := range media {
-		key := m.Path
-		if abs, err := filepath.Abs(key); err == nil {
-			key = filepath.Clean(abs)
-		} else {
-			key = filepath.Clean(key)
-		}
-		if seen[key] {
+		if seen[m.Path] {
 			continue
 		}
-		seen[key] = true
+		seen[m.Path] = true
 		result = append(result, m)
 	}
 	return result
