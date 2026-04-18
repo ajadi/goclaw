@@ -820,18 +820,38 @@ func (t *MyTool) Execute(ctx context.Context, params MyParams) (*Result, error) 
 }
 ```
 
+### web_search Configuration
+
+**Overview:** web_search is tenant-scoped only (as of v3.2, issue #952). Config is edited exclusively via `/tools/builtin/web_search` UI (or `/v1/tools/builtin/web_search/tenant-config` HTTP API for automation).
+
+**Key behaviors:**
+- Supports provider chain: Exa, Tavily, Brave, DuckDuckGo
+- Tenant admins specify `provider_order` to prioritize which providers to try (in order)
+- Per-provider `enabled` flag gates usage; unknown providers are silently skipped
+- **DuckDuckGo is always appended as the last-resort fallback regardless of tenant `enabled` setting — tenant admins cannot fully disable web_search.**
+- API keys stored in `config_secrets` table (encrypted, tenant-scoped); never in `settings` JSON
+- Defaults to DuckDuckGo only if no other provider keys are configured
+
+**Configuration path (old, removed):** `config.Tools.Web.*` in `config.json5` — no longer supported. Use UI only.
+
+**Migration:** Inline API keys from `config.json5` and legacy `builtin_tool_tenant_configs.settings` blobs are auto-migrated to `config_secrets` on first server startup (data hook 055).
+
 ### Schema Contracts
 
 #### web_search (tenant override shape)
 ```json
 {
-  "provider_order": ["exa", "tavily", "brave", "duckduckgo"],
-  "exa": { "enabled": true, "max_results": 10 },
-  "tavily": { "enabled": true, "max_results": 5 },
+  "provider_order": ["brave", "exa"],
   "brave": { "enabled": true, "max_results": 5 },
-  "duckduckgo": { "enabled": true, "max_results": 10 }
+  "exa": { "enabled": false },
+  "duckduckgo": { "enabled": false }
 }
 ```
+
+**Fields:**
+- `provider_order`: List of provider names in preference order (unknown names silently ignored). Optional.
+- Per-provider object: `enabled` (bool, optional) + `max_results` (int, optional). If `enabled: false`, provider is skipped even if API key exists. DuckDuckGo `enabled: false` is ignored (always-on).
+- Secrets (API keys): Configure via `/v1/tools/builtin/web_search/tenant-config` PUT endpoint, not in this settings blob
 
 #### web_fetch (tenant override shape)
 ```json
