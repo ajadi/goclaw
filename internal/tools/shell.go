@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"runtime"
 	"strings"
 	"time"
 
@@ -360,9 +361,19 @@ func (t *ExecTool) executeOnHost(ctx context.Context, command, cwd string) *Resu
 	ctx, cancel := context.WithTimeout(ctx, t.timeout)
 	defer cancel()
 
+	//<<<<<<< HEAD
+	var cmd *exec.Cmd
+	if runtime.GOOS == "windows" {
+		cmd = exec.Command("cmd", "/c", command)
+	} else {
+		cmd = exec.Command("sh", "-c", command)
+	}
+
+	//=======
 	// Use plain exec.Command (not CommandContext) so we control the kill sequence.
 	// CommandContext would SIGKILL only the direct child, leaving forked grandchildren alive.
-	cmd := exec.Command("sh", "-c", command)
+	//	cmd := exec.Command("sh", "-c", command)
+	//>>>>>>> dev
 	cmd.Dir = cwd
 
 	// Scrub credential env vars so fall-through exec cannot exfiltrate
