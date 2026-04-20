@@ -64,7 +64,7 @@ func (c *APIClient) GetPage(ctx context.Context) (*PageInfo, error) {
 	}
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
 	req.Header.Set("Content-Type", "application/json")
-	setCommonHeaders(req)
+	setAcceptJSONHeader(req)
 
 	res, err := c.httpClient.Do(req)
 	if err != nil {
@@ -284,7 +284,7 @@ func (c *APIClient) newPageRequest(ctx context.Context, method, rawURL string, b
 
 	// Keep the header for compatibility; official docs require the query token.
 	req.Header.Set("Authorization", "Bearer "+c.pageAccessToken)
-	setCommonHeaders(req)
+	setAcceptJSONHeader(req)
 	return req, nil
 }
 
@@ -353,9 +353,8 @@ func isRateLimitError(err error) bool {
 	return ae.Code == 429 || ae.Code == 4029
 }
 
-// setCommonHeaders applies headers required for every Pancake API call.
-// Accept: application/json forces JSON response negotiation — without it,
-// Pancake returns SPA HTML for Shopee GETs (verified 2026-04-20).
-func setCommonHeaders(req *http.Request) {
+// setAcceptJSONHeader sets Accept: application/json for JSON response negotiation.
+// Without it, Pancake returns SPA HTML for Shopee GETs (verified 2026-04-20).
+func setAcceptJSONHeader(req *http.Request) {
 	req.Header.Set("Accept", "application/json")
 }

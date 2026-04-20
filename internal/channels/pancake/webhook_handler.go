@@ -251,11 +251,18 @@ func truncateBody(body []byte, maxLen int) string {
 // platformPrefixes lists marketplace platform tokens where convID uses a
 // 2-segment page identifier (e.g. "spo_25409726_senderID").
 //
-// Scope (M1): "spo" (Shopee) only. "lzd" (Lazada) and "tpd" (Tokopedia) are
-// NOT added here because neither has been verified against a live Pancake
-// payload. Add them only after onboarding a shop and capturing convID shape.
+// Default: "spo" (Shopee) only. "lzd" (Lazada) and "tpd" (Tokopedia) are
+// NOT added by default because neither has been verified against a live
+// Pancake payload. Use RegisterPlatformPrefix to add verified platforms.
 var platformPrefixes = map[string]struct{}{
 	"spo": {}, // Shopee — verified via curl 2026-04-20
+}
+
+// RegisterPlatformPrefix registers a marketplace prefix for convID parsing.
+// Use this to add verified platforms (e.g. "lzd" for Lazada) after capturing
+// live webhook payloads. Thread-safe for use during init().
+func RegisterPlatformPrefix(prefix string) {
+	platformPrefixes[prefix] = struct{}{}
 }
 
 // resolvePageIDFromConvID extracts the page identifier from a Pancake
