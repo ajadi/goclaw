@@ -281,6 +281,13 @@ func (w *WebhookWorker) pollOneTenant(ctx context.Context, slotRelease func()) b
 // protected by a defer recover() to prevent worker crashes from one bad row.
 // lease is the token returned by ClaimNext; used for optimistic-concurrency (K5).
 func (w *WebhookWorker) execute(ctx context.Context, call *store.WebhookCallData, tenantID uuid.UUID, lease string) {
+	// Use WithoutCancel so DB status writes survive worker ctx cancellation at
+	// graceful shutdown. Prevents unnecessary re-delivery via reclaimStale when
+	// the send completes but the terminal status update races with shutdown.
+	// Initialized BEFORE the panic defer so the recovery path uses a ctx with
+	// tenant ID (raw ctx lacks it, which would make requireTenantID fail).
+	tctx := store.WithTenantID(context.WithoutCancel(ctx), tenantID)
+
 	defer func() {
 		if r := recover(); r != nil {
 			slog.Error("security.webhook.worker_panic",
@@ -288,14 +295,9 @@ func (w *WebhookWorker) execute(ctx context.Context, call *store.WebhookCallData
 				"delivery_id", call.DeliveryID,
 				"panic", r,
 			)
-			w.updateRetry(ctx, call, tenantID, lease, fmt.Sprintf("panic: %v", r))
+			w.updateRetry(tctx, call, tenantID, lease, fmt.Sprintf("panic: %v", r))
 		}
 	}()
-
-	// Use WithoutCancel so DB status writes survive worker ctx cancellation at
-	// graceful shutdown. Prevents unnecessary re-delivery via reclaimStale when
-	// the send completes but the terminal status update races with shutdown.
-	tctx := store.WithTenantID(context.WithoutCancel(ctx), tenantID)
 
 	// Decode stored request payload.
 	var req asyncPayload
