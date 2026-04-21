@@ -551,6 +551,74 @@ Six distinct workspace scenarios:
 
 ---
 
+## 12. Webhook Subsystem
+
+External systems trigger agents or send channel messages via the webhook subsystem without using the gateway token (WebSocket/bearer) protocol.
+
+### Components
+
+| Component | Location | Role |
+|-----------|----------|------|
+| Admin CRUD handlers | `internal/http/webhooks_admin.go` | Create/list/get/patch/rotate/revoke webhook rows |
+| Auth middleware | `internal/http/webhooks_auth.go` | Bearer + HMAC verification, localhost gate, kind check, rate limit, idempotency |
+| LLM endpoint | `internal/http/webhooks_llm.go` | `POST /v1/webhooks/llm` — sync (30s) + async dispatch |
+| Message endpoint | `internal/http/webhooks_message.go` | `POST /v1/webhooks/message` — channel delivery with media |
+| Rate limiter | `internal/http/webhooks_ratelimit.go` | Per-webhook + per-tenant token bucket |
+| Idempotency | `internal/http/webhooks_idempotency.go` | `Idempotency-Key` header cache (24h TTL) |
+| Media fetch | `internal/http/webhooks_media_fetch.go` | SSRF-guarded HEAD probe + MIME validation |
+| Callback worker | `internal/webhooks/worker.go` | Poll loop, claim, agent invoke, HMAC sign, HTTP POST, retry |
+| Backoff | `internal/webhooks/backoff.go` | Exponential schedule `[30s, 2m, 10m, 1h, 6h]` with ±10% jitter |
+| Signing | `internal/webhooks/sign.go` | `Sign(key, ts, body)` → `X-Webhook-Signature: t=...,v1=...` |
+| Callback limiter | `internal/webhooks/limiter.go` | Per-tenant concurrency cap for outbound delivery goroutines |
+| Store interfaces | `internal/store/` | `WebhookStore`, `WebhookCallStore` |
+| PG store | `internal/store/pg/webhook_store.go`, `webhook_call_store.go` | Tenant-scoped SQL |
+| SQLite store | `internal/store/sqlitestore/` | Lite edition support |
+| Migrations | `migrations/` (PG), `internal/store/sqlitestore/schema.sql` (SQLite) | `webhooks` + `webhook_calls` tables |
+
+### Inbound Flow
+
+```
+POST /v1/webhooks/llm or /v1/webhooks/message
+  → WebhookAuthMiddleware
+      body cap → bearer/HMAC auth → localhost gate → kind check
+      → rate limit (per-webhook + per-tenant) → idempotency → inject context
+  → Handler (LLM or Message)
+      sync: agent.Run(30s timeout) → 200 with output
+      async: store WebhookCallData{status=queued} → 202 {call_id}
+```
+
+### Outbound Callback Flow (async only)
+
+```
+WebhookWorker.pollOneTenant()
+  → calls.ClaimNext() → execute goroutine
+  → invokeAgent (30s) → build callbackPayload
+  → SSRF re-validate callback_url
+  → HMAC sign body → POST to callback_url
+  → 2xx: done | 4xx: failed | 5xx/net: retry with backoff | 429: Retry-After
+```
+
+### Security Log Events
+
+| Event | Level | Trigger |
+|-------|-------|---------|
+| `security.webhook.auth_failed` | Warn | Invalid bearer / HMAC |
+| `security.webhook.hmac_invalid` | Warn (via auth_failed) | HMAC mismatch |
+| `security.webhook.body_too_large` | Warn | Body exceeds cap |
+| `security.webhook.localhost_only_violation` | Warn | Non-loopback caller on restricted webhook |
+| `security.webhook.kind_mismatch` | Warn | Caller path vs webhook kind mismatch |
+| `security.webhook.rate_limited` | Warn | Per-webhook or per-tenant rate cap hit |
+| `security.webhook.tenant_mismatch` | Warn | Agent UUID does not match webhook tenant |
+| `security.webhook.tenant_leak_attempt` | Warn | Channel belongs to different tenant |
+| `security.webhook.ssrf_blocked` | Warn | `media_url` SSRF rejection |
+| `security.webhook.callback_ssrf_blocked` | Warn | `callback_url` SSRF rejection at delivery |
+| `security.webhook.worker_panic` | Error | Delivery goroutine panic caught |
+| `security.webhook.admin_denied` | Warn | Non-admin access to admin CRUD routes |
+
+See `docs/webhooks.md` for the full integrator reference (auth, retries, HMAC examples).
+
+---
+
 ## Cross-References
 
 | Document | Content |
