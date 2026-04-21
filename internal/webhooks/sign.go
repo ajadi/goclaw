@@ -17,7 +17,7 @@ import (
 )
 
 // Sign computes X-Webhook-Signature header value for an outbound callback.
-// key is the raw HMAC key bytes (hex.DecodeString(webhook.SecretHash)).
+// key is []byte(rawSecret) — the AES-decrypted plaintext secret from encrypted_secret.
 // ts is the Unix timestamp (seconds) to embed in the header.
 // body is the request body bytes to sign.
 //
