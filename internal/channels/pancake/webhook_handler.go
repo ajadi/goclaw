@@ -256,6 +256,9 @@ func truncateBody(body []byte, maxLen int) string {
 // payload. Add them only after onboarding a shop and capturing convID shape.
 var platformPrefixes = map[string]struct{}{
 	"spo": {}, // Shopee — verified via curl 2026-04-20
+	"tt":  {}, // TikTok Livestream AIO
+	"ttm": {}, // TikTok Business Messaging
+	"tts": {}, // TikTok Shop
 }
 
 // resolvePageIDFromConvID extracts the page identifier from a Pancake

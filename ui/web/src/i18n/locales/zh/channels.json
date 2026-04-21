@@ -244,7 +244,8 @@
     "skills": { "label": "Skill过滤", "help": "限制此群组可用的Skill" },
     "tools": { "label": "工具白名单", "help": "限制Agent在此群组中可使用的工具" },
     "system_prompt": { "label": "系统提示词" },
-    "platform": { "label": "平台", "help": "选择此 Pancake 页面所服务的平台。" }
+    "platform": { "label": "平台", "help": "选择此 Pancake 页面所服务的平台。" },
+    "tiktok_type": { "label": "TikTok 类型", "help": "选择此页面的 TikTok 账户类型" }
   },
   "fieldOptions": {
     "block_reply": {

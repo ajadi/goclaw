@@ -317,7 +317,8 @@
       "help": "Restrict which tools the agent can use in this group"
     },
     "system_prompt": { "label": "System Prompt" },
-    "platform": { "label": "Platform", "help": "Select the platform this Pancake page serves." }
+    "platform": { "label": "Platform", "help": "Select the platform this Pancake page serves." },
+    "tiktok_type": { "label": "TikTok Type", "help": "Select the TikTok account type for this page" }
   },
   "fieldOptions": {
     "block_reply": {

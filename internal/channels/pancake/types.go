@@ -16,10 +16,11 @@ type pancakeCreds struct {
 type pancakeInstanceConfig struct {
 	PageID        string `json:"page_id"`
 	WebhookPageID string `json:"webhook_page_id,omitempty"` // native platform page ID sent in webhooks (e.g. Facebook page ID vs Pancake internal ID)
-	Platform      string `json:"platform,omitempty"` // set explicitly via UI; auto-detected at Start() as fallback for existing channels
+	Platform   string `json:"platform,omitempty"` // set explicitly via UI; auto-detected at Start() as fallback for existing channels
 	// Known values: facebook/instagram/threads/tiktok/youtube/shopee/line/google/chat_plugin/lazada/tokopedia
 	// Excluded (have native channel implementations): telegram/zalo/whatsapp
-	Features struct {
+	TikTokType string `json:"tiktok_type,omitempty"` // livestream|messaging|shop (only when platform=tiktok)
+	Features   struct {
 		InboxReply   bool `json:"inbox_reply"`
 		CommentReply bool `json:"comment_reply"`
 		FirstInbox   bool `json:"first_inbox"`  // send one-time DM to commenter after comment reply
