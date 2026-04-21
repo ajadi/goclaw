@@ -15,7 +15,6 @@ import (
 
 	httphandlers "github.com/nextlevelbuilder/goclaw/internal/http"
 	"github.com/nextlevelbuilder/goclaw/internal/crypto"
-	"github.com/nextlevelbuilder/goclaw/internal/store"
 	"github.com/nextlevelbuilder/goclaw/internal/store/pg"
 )
 

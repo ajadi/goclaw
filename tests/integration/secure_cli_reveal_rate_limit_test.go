@@ -3,7 +3,6 @@
 package integration
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
