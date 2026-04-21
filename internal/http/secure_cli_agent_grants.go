@@ -18,21 +18,37 @@ import (
 	"github.com/nextlevelbuilder/goclaw/pkg/protocol"
 )
 
-// envRevealLimiter caps POST .../env:reveal to 10 calls/min per user (burst 3).
-// Prevents bulk secret-scraping through the reveal endpoint.
-var envRevealLimiter = newPerKeyRateLimiter(10, 3)
+// Default reveal rate-limit: 10 calls/min per caller, burst 3.
+// Per-instance limiter avoids cross-test state leakage when the test suite
+// constructs multiple handlers in parallel.
+const (
+	envRevealRPM   = 10
+	envRevealBurst = 3
+)
 
 // SecureCLIGrantHandler handles CRUD for per-agent secure CLI grants.
 type SecureCLIGrantHandler struct {
 	grants      store.SecureCLIAgentGrantStore
 	tenantStore store.TenantStore
 	msgBus      *bus.MessageBus
+	envLimiter  *perKeyRateLimiter
 }
 
 // NewSecureCLIGrantHandler creates the handler. tenantStore may be nil (requireTenantAdmin
 // handles that gracefully with a 501), but should always be provided in production.
 func NewSecureCLIGrantHandler(gs store.SecureCLIAgentGrantStore, ts store.TenantStore, msgBus *bus.MessageBus) *SecureCLIGrantHandler {
-	return &SecureCLIGrantHandler{grants: gs, tenantStore: ts, msgBus: msgBus}
+	return &SecureCLIGrantHandler{
+		grants:      gs,
+		tenantStore: ts,
+		msgBus:      msgBus,
+		envLimiter:  newPerKeyRateLimiter(envRevealRPM, envRevealBurst),
+	}
+}
+
+// SetEnvRevealLimiter overrides the env:reveal rate limiter. Intended for tests
+// that need deterministic limits. Not safe to call concurrently with in-flight requests.
+func (h *SecureCLIGrantHandler) SetEnvRevealLimiter(rpm, burst int) {
+	h.envLimiter = newPerKeyRateLimiter(rpm, burst)
 }
 
 // RegisterRoutes registers agent grant routes nested under cli-credentials.
@@ -332,7 +348,7 @@ func (h *SecureCLIGrantHandler) handleRevealEnv(w http.ResponseWriter, r *http.R
 
 	// Rate limit: 10 reveals/min per caller.
 	rlKey := rateLimitKeyFromRequest(r)
-	if !envRevealLimiter.Allow(rlKey) {
+	if !h.envLimiter.Allow(rlKey) {
 		slog.Warn("security.rate_limited", "endpoint", "env:reveal", "key", rlKey)
 		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": i18n.T(locale, i18n.MsgGrantEnvRevealLimit)})
 		return
