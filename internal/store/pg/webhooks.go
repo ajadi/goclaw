@@ -65,6 +65,16 @@ func scanWebhookRow(row interface {
 }
 
 func (s *PGWebhookStore) Create(ctx context.Context, w *store.WebhookData) error {
+	// scopes and ip_allowlist are NOT NULL DEFAULT '{}'; coerce nil slices
+	// to empty arrays so Create works without requiring callers to set them.
+	scopes := w.Scopes
+	if scopes == nil {
+		scopes = []string{}
+	}
+	ipAllow := w.IPAllowlist
+	if ipAllow == nil {
+		ipAllow = []string{}
+	}
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO webhooks
 		 (id, tenant_id, agent_id, name, kind, secret_prefix, secret_hash, encrypted_secret,
@@ -73,7 +83,7 @@ func (s *PGWebhookStore) Create(ctx context.Context, w *store.WebhookData) error
 		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
 		w.ID, w.TenantID, nilUUID(w.AgentID),
 		w.Name, w.Kind, nilStr(w.SecretPrefix), w.SecretHash, w.EncryptedSecret,
-		pqStringArray(w.Scopes), nilUUID(w.ChannelID), w.RateLimitPerMin, pqStringArray(w.IPAllowlist),
+		pqStringArray(scopes), nilUUID(w.ChannelID), w.RateLimitPerMin, pqStringArray(ipAllow),
 		w.RequireHMAC, w.LocalhostOnly, w.Revoked,
 		nilStr(w.CreatedBy), w.CreatedAt, w.UpdatedAt,
 	)
