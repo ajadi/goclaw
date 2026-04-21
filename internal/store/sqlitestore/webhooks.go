@@ -40,7 +40,7 @@ func scanSQLiteWebhookRow(row interface {
 
 	err := row.Scan(
 		&w.ID, &w.TenantID, &agentID,
-		&w.Name, &w.Kind, &secretPrefix, &w.SecretHash,
+		&w.Name, &w.Kind, &secretPrefix, &w.SecretHash, &w.EncryptedSecret,
 		&scopesRaw, &channelID, &w.RateLimitPerMin, &ipAllowlistRaw,
 		&w.RequireHMAC, &w.LocalhostOnly, &w.Revoked, &createdBy,
 		createdAt, updatedAt, &lastUsedAt,
@@ -67,7 +67,7 @@ func scanSQLiteWebhookRow(row interface {
 }
 
 // sqliteWebhookSelectCols is the canonical SELECT column list for webhooks in SQLite.
-const sqliteWebhookSelectCols = `id, tenant_id, agent_id, name, kind, secret_prefix, secret_hash,
+const sqliteWebhookSelectCols = `id, tenant_id, agent_id, name, kind, secret_prefix, secret_hash, encrypted_secret,
 	scopes, channel_id, rate_limit_per_min, ip_allowlist,
 	require_hmac, localhost_only, revoked, created_by,
 	created_at, updated_at, last_used_at`
@@ -75,12 +75,12 @@ const sqliteWebhookSelectCols = `id, tenant_id, agent_id, name, kind, secret_pre
 func (s *SQLiteWebhookStore) Create(ctx context.Context, w *store.WebhookData) error {
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO webhooks
-		 (id, tenant_id, agent_id, name, kind, secret_prefix, secret_hash,
+		 (id, tenant_id, agent_id, name, kind, secret_prefix, secret_hash, encrypted_secret,
 		  scopes, channel_id, rate_limit_per_min, ip_allowlist,
 		  require_hmac, localhost_only, revoked, created_by, created_at, updated_at)
-		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		w.ID, w.TenantID, nilUUID(w.AgentID),
-		w.Name, w.Kind, nilStr(w.SecretPrefix), w.SecretHash,
+		w.Name, w.Kind, nilStr(w.SecretPrefix), w.SecretHash, w.EncryptedSecret,
 		jsonStringArray(w.Scopes), nilUUID(w.ChannelID), w.RateLimitPerMin, jsonStringArray(w.IPAllowlist),
 		w.RequireHMAC, w.LocalhostOnly, w.Revoked,
 		nilStr(w.CreatedBy), w.CreatedAt, w.UpdatedAt,
@@ -112,6 +112,31 @@ func (s *SQLiteWebhookStore) GetByHash(ctx context.Context, secretHash string) (
 		 FROM webhooks
 		 WHERE secret_hash = ? AND tenant_id = ? AND revoked = 0`,
 		secretHash, tid,
+	)
+	return scanSQLiteWebhookRow(row)
+}
+
+// GetByHashUnscoped looks up a webhook by secret_hash without a tenant filter.
+// Intended only for WebhookAuthMiddleware pre-auth resolution before tenant context
+// has been established. Downstream queries must remain tenant-scoped.
+func (s *SQLiteWebhookStore) GetByHashUnscoped(ctx context.Context, secretHash string) (*store.WebhookData, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT `+sqliteWebhookSelectCols+`
+		 FROM webhooks
+		 WHERE secret_hash = ? AND revoked = 0`,
+		secretHash,
+	)
+	return scanSQLiteWebhookRow(row)
+}
+
+// GetByIDUnscoped looks up a webhook by UUID without a tenant filter.
+// Intended only for WebhookAuthMiddleware HMAC pre-auth resolution.
+func (s *SQLiteWebhookStore) GetByIDUnscoped(ctx context.Context, id uuid.UUID) (*store.WebhookData, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT `+sqliteWebhookSelectCols+`
+		 FROM webhooks
+		 WHERE id = ?`,
+		id,
 	)
 	return scanSQLiteWebhookRow(row)
 }
@@ -163,15 +188,15 @@ func (s *SQLiteWebhookStore) Update(ctx context.Context, id uuid.UUID, updates m
 	return execMapUpdateWhereTenant(ctx, s.db, "webhooks", updates, id, tid)
 }
 
-func (s *SQLiteWebhookStore) RotateSecret(ctx context.Context, id uuid.UUID, newSecretHash, newPrefix string) error {
+func (s *SQLiteWebhookStore) RotateSecret(ctx context.Context, id uuid.UUID, newSecretHash, newPrefix, newEncryptedSecret string) error {
 	tid, err := requireTenantID(ctx)
 	if err != nil {
 		return err
 	}
 	res, err := s.db.ExecContext(ctx,
-		`UPDATE webhooks SET secret_hash = ?, secret_prefix = ?, updated_at = ?
+		`UPDATE webhooks SET secret_hash = ?, secret_prefix = ?, encrypted_secret = ?, updated_at = ?
 		 WHERE id = ? AND tenant_id = ?`,
-		newSecretHash, newPrefix, time.Now(), id, tid,
+		newSecretHash, newPrefix, newEncryptedSecret, time.Now(), id, tid,
 	)
 	if err != nil {
 		return err

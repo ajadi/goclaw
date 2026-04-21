@@ -69,11 +69,11 @@ type webhookInputMessage struct {
 
 // webhookLLMSyncResp is the 200 response for synchronous LLM calls.
 type webhookLLMSyncResp struct {
-	CallID       string              `json:"call_id"`
-	AgentID      string              `json:"agent_id"`
-	Output       string              `json:"output"`
-	Usage        *webhookLLMUsage    `json:"usage,omitempty"`
-	FinishReason string              `json:"finish_reason"`
+	CallID       string           `json:"call_id"`
+	AgentID      string           `json:"agent_id"`
+	Output       string           `json:"output"`
+	Usage        *webhookLLMUsage `json:"usage,omitempty"`
+	FinishReason string           `json:"finish_reason"`
 }
 
 // webhookLLMUsage mirrors providers.Usage for the response envelope.
@@ -99,6 +99,7 @@ type WebhookLLMHandler struct {
 	webhooks    store.WebhookStore
 	limiter     *webhookLimiter
 	lane        *scheduler.Lane
+	encKey      string // AES-256-GCM key for decrypting encrypted_secret at HMAC verify time
 	// syncTimeout overrides webhookLLMTimeout (30s) — set in tests only.
 	syncTimeout time.Duration
 }
@@ -124,6 +125,11 @@ func NewWebhookLLMHandler(
 	}
 }
 
+// SetEncKey sets the AES-256-GCM encryption key for decrypting webhook secrets at HMAC verify time.
+func (h *WebhookLLMHandler) SetEncKey(encKey string) {
+	h.encKey = encKey
+}
+
 // RegisterRoutes mounts POST /v1/webhooks/llm behind the auth middleware.
 // Mounted in both Standard and Lite editions (localhost_only enforced at middleware level).
 func (h *WebhookLLMHandler) RegisterRoutes(mux *http.ServeMux) {
@@ -131,6 +137,7 @@ func (h *WebhookLLMHandler) RegisterRoutes(mux *http.ServeMux) {
 		h.webhooks,
 		h.callStore,
 		h.limiter,
+		h.encKey,
 		"llm",
 		WebhookMaxBodyLLM,
 	)
@@ -226,8 +233,12 @@ func (h *WebhookLLMHandler) handle(w http.ResponseWriter, r *http.Request) {
 	deliveryID := store.GenNewID()
 	now := time.Now()
 
-	// Encode raw request for the audit record.
-	requestPayload, _ := json.Marshal(req)
+	// Capture raw body bytes for body_hash computation.
+	// req was decoded from the HTTP body; re-marshal to get canonical bytes.
+	// The audit payload uses the canonical JSON shape {"body_hash":"...","meta":{...}}
+	// so PG jsonb insert never triggers error 22P02.
+	reqBytes, _ := json.Marshal(req)
+	requestPayload, _ := buildAuditPayload(reqBytes, req)
 
 	// Dispatch based on mode.
 	switch mode {
@@ -345,7 +356,7 @@ func (h *WebhookLLMHandler) handleSync(
 				RequestPayload: requestPayload,
 				LastError:      &errMsg,
 				CreatedAt:      now,
-				CompletedAt:    ptr(time.Now()),
+				CompletedAt:    new(time.Now()),
 				StartedAt:      &now,
 			})
 			writeError(w, http.StatusGatewayTimeout, protocol.ErrInternal,
@@ -367,7 +378,7 @@ func (h *WebhookLLMHandler) handleSync(
 			RequestPayload: requestPayload,
 			LastError:      &errMsg,
 			CreatedAt:      now,
-			CompletedAt:    ptr(time.Now()),
+			CompletedAt:    new(time.Now()),
 			StartedAt:      &now,
 		})
 		writeError(w, http.StatusInternalServerError, protocol.ErrInternal,
@@ -551,4 +562,6 @@ func resolveWebhookSessionKey(reqSessionKey, agentID string, webhookID uuid.UUID
 }
 
 // ptr returns a pointer to v.
-func ptr[T any](v T) *T { return &v }
+//
+//go:fix inline
+func ptr[T any](v T) *T { return new(v) }

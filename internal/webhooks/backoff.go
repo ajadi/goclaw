@@ -25,10 +25,7 @@ const MaxAttempts = 5
 // attempt is the number of attempts already made (pre-send count).
 // If attempt >= len(backoffSchedule) the last bucket is used (6h).
 func DelayFor(attempt int) time.Duration {
-	idx := attempt
-	if idx < 0 {
-		idx = 0
-	}
+	idx := max(attempt, 0)
 	if idx >= len(backoffSchedule) {
 		idx = len(backoffSchedule) - 1
 	}

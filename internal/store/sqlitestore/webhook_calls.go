@@ -30,7 +30,7 @@ func NewSQLiteWebhookCallStore(db *sql.DB) *SQLiteWebhookCallStore {
 // sqliteWebhookCallSelectCols is the canonical SELECT column list for webhook_calls in SQLite.
 const sqliteWebhookCallSelectCols = `id, tenant_id, webhook_id, agent_id, delivery_id,
 	idempotency_key, mode, status, callback_url, attempts,
-	next_attempt_at, started_at, request_payload, response, last_error,
+	next_attempt_at, started_at, lease_token, request_payload, response, last_error,
 	created_at, completed_at`
 
 // scanSQLiteWebhookCallRow scans a single webhook_calls row from SQLite into WebhookCallData.
@@ -45,7 +45,7 @@ func scanSQLiteWebhookCallRow(row interface {
 	err := row.Scan(
 		&c.ID, &c.TenantID, &c.WebhookID, &agentID, &c.DeliveryID,
 		&c.IdempotencyKey, &c.Mode, &c.Status, &c.CallbackURL, &c.Attempts,
-		&nextAttemptAt, &startedAt, &c.RequestPayload, &c.Response, &c.LastError,
+		&nextAttemptAt, &startedAt, &c.LeaseToken, &c.RequestPayload, &c.Response, &c.LastError,
 		createdAt, &completedAt,
 	)
 	if err != nil {
@@ -124,6 +124,16 @@ func (s *SQLiteWebhookCallStore) UpdateStatus(ctx context.Context, id uuid.UUID,
 	return execMapUpdateWhereTenantNoUpdatedAt(ctx, s.db, "webhook_calls", updates, id, tid)
 }
 
+// UpdateStatusCAS applies updates with an optimistic-concurrency guard on lease_token.
+// Returns store.ErrLeaseExpired if 0 rows were affected (lease mismatch → row reclaimed).
+func (s *SQLiteWebhookCallStore) UpdateStatusCAS(ctx context.Context, id uuid.UUID, lease string, updates map[string]any) error {
+	tid, err := requireTenantID(ctx)
+	if err != nil {
+		return err
+	}
+	return execMapUpdateWhereTenantLeaseNoUpdatedAt(ctx, s.db, "webhook_calls", updates, id, tid, lease)
+}
+
 // ClaimNext atomically claims the next queued call due for processing.
 // SQLite has no FOR UPDATE SKIP LOCKED, so we use BEGIN IMMEDIATE to serialize
 // writers (single-writer acceptable in Lite edition).
@@ -154,10 +164,12 @@ func (s *SQLiteWebhookCallStore) ClaimNext(ctx context.Context, tenantID uuid.UU
 		return nil, err // includes sql.ErrNoRows when queue empty
 	}
 
-	// Mark running and record started_at. Attempts untouched — worker increments post-send.
+	// Mark running, record started_at, and set a fresh lease_token for CAS guards.
+	// Attempts untouched — worker increments post-send.
+	lease := uuid.New().String()
 	_, err = tx.ExecContext(ctx,
-		`UPDATE webhook_calls SET status = 'running', started_at = ? WHERE id = ?`,
-		now, callID,
+		`UPDATE webhook_calls SET status = 'running', started_at = ?, lease_token = ? WHERE id = ?`,
+		now, lease, callID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("webhook_calls ClaimNext update: %w", err)
@@ -247,11 +259,12 @@ func (s *SQLiteWebhookCallStore) DeleteOlderThan(ctx context.Context, tenantID u
 }
 
 // ReclaimStale resets stale running rows back to queued so the worker can retry them.
+// Clears lease_token so any in-flight UpdateStatusCAS from the crashed goroutine returns ErrLeaseExpired.
 // SQLite stores timestamps as ISO-8601 strings; comparison uses standard string ordering.
 func (s *SQLiteWebhookCallStore) ReclaimStale(ctx context.Context, staleThreshold time.Time) (int64, error) {
 	res, err := s.db.ExecContext(ctx,
 		`UPDATE webhook_calls
-		 SET status = 'queued', started_at = NULL
+		 SET status = 'queued', started_at = NULL, lease_token = NULL
 		 WHERE status = 'running' AND started_at < ?`,
 		staleThreshold,
 	)
@@ -259,6 +272,36 @@ func (s *SQLiteWebhookCallStore) ReclaimStale(ctx context.Context, staleThreshol
 		return 0, err
 	}
 	return res.RowsAffected()
+}
+
+// execMapUpdateWhereTenantLeaseNoUpdatedAt is like execMapUpdateWhereTenantNoUpdatedAt but adds
+// AND lease_token = ? to the WHERE clause for optimistic concurrency.
+// Returns store.ErrLeaseExpired when RowsAffected() == 0 (lease mismatch).
+func execMapUpdateWhereTenantLeaseNoUpdatedAt(ctx context.Context, db *sql.DB, table string, updates map[string]any, id, tenantID uuid.UUID, lease string) error {
+	if len(updates) == 0 {
+		return nil
+	}
+	var setClauses []string
+	var args []any
+	for col, val := range updates {
+		if !validColumnName.MatchString(col) {
+			return fmt.Errorf("invalid column name: %q", col)
+		}
+		setClauses = append(setClauses, col+" = ?")
+		args = append(args, sqliteVal(val))
+	}
+	args = append(args, id, tenantID, lease)
+	q := fmt.Sprintf("UPDATE %s SET %s WHERE id = ? AND tenant_id = ? AND lease_token = ?",
+		table, strings.Join(setClauses, ", "))
+	res, err := db.ExecContext(ctx, q, args...)
+	if err != nil {
+		return err
+	}
+	affected, _ := res.RowsAffected()
+	if affected == 0 {
+		return store.ErrLeaseExpired
+	}
+	return nil
 }
 
 // execMapUpdateWhereTenantNoUpdatedAt builds and runs a dynamic UPDATE with id+tenant_id

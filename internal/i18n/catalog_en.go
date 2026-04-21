@@ -235,6 +235,8 @@ func init() {
 		MsgWebhookLaneSaturated:           "webhook processing lane is at capacity",
 		MsgWebhookLocalhostOnlyViolation:  "this webhook is restricted to localhost callers",
 		MsgWebhookMediaChannelUnsupported: "channel does not support media attachments",
+		MsgWebhookIPDenied:                "request origin is not in the IP allowlist",
+		MsgWebhookEncryptionUnavailable:   "webhook encryption key not configured; set GOCLAW_ENCRYPTION_KEY to enable webhooks",
 
 		// Hooks
 		MsgHookInvalidMatcher:          "invalid matcher regex: %s",

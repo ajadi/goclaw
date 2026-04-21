@@ -235,6 +235,8 @@ func init() {
 		MsgWebhookLaneSaturated:           "Webhook 处理通道已满",
 		MsgWebhookLocalhostOnlyViolation:  "此 Webhook 仅限本地调用",
 		MsgWebhookMediaChannelUnsupported: "频道不支持媒体附件",
+		MsgWebhookIPDenied:                "请求来源不在 IP 白名单中",
+		MsgWebhookEncryptionUnavailable:   "Webhook 加密密钥未配置；请设置 GOCLAW_ENCRYPTION_KEY 以启用 Webhook",
 
 		// Hooks
 		MsgHookInvalidMatcher:          "无效的匹配器正则表达式: %s",

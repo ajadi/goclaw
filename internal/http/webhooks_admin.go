@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/nextlevelbuilder/goclaw/internal/bus"
+	"github.com/nextlevelbuilder/goclaw/internal/crypto"
 	"github.com/nextlevelbuilder/goclaw/internal/edition"
 	"github.com/nextlevelbuilder/goclaw/internal/i18n"
 	"github.com/nextlevelbuilder/goclaw/internal/store"
@@ -30,10 +31,13 @@ var webhookKinds = map[string]bool{
 
 // WebhooksAdminHandler implements CRUD for webhook registry entries.
 // All endpoints are tenant-admin-gated (requireTenantAdmin).
+// encKey is the AES-256-GCM encryption key (GOCLAW_ENCRYPTION_KEY); if empty, encrypted_secret
+// is stored as "" and HMAC auth requires rotation before it can be used.
 type WebhooksAdminHandler struct {
 	webhooks store.WebhookStore
 	tenants  store.TenantStore
 	msgBus   *bus.MessageBus
+	encKey   string // AES-256-GCM key for encrypting raw webhook secrets at rest
 }
 
 // NewWebhooksAdminHandler creates a handler for webhook admin endpoints.
@@ -43,6 +47,12 @@ func NewWebhooksAdminHandler(webhooks store.WebhookStore, tenants store.TenantSt
 		tenants:  tenants,
 		msgBus:   msgBus,
 	}
+}
+
+// SetEncKey sets the AES-256-GCM encryption key used to encrypt raw webhook secrets at rest.
+// Must be called before the first Create/Rotate request; safe to call at startup only.
+func (h *WebhooksAdminHandler) SetEncKey(encKey string) {
+	h.encKey = encKey
 }
 
 // RegisterRoutes registers all webhook admin routes on mux.
@@ -74,8 +84,8 @@ type createWebhookReq struct {
 }
 
 // webhookCreateResp is the response for create and rotate — includes raw secret once.
-// hmac_signing_key = hex(SHA-256(raw_secret)) — callers must sign HMAC requests with this.
-// See design notes in phase-08: HMAC key = decoded bytes of secret_hash.
+// hmac_signing_key = raw secret itself — callers sign HMAC requests using raw secret bytes.
+// The raw secret is encrypted at rest; secret_hash is kept only for bearer-token lookup.
 type webhookCreateResp struct {
 	ID             uuid.UUID  `json:"id"`
 	TenantID       uuid.UUID  `json:"tenant_id"`
@@ -83,8 +93,8 @@ type webhookCreateResp struct {
 	Name           string     `json:"name"`
 	Kind           string     `json:"kind"`
 	SecretPrefix   string     `json:"secret_prefix"`
-	Secret         string     `json:"secret"`          // raw secret — shown ONCE
-	HMACSigningKey string     `json:"hmac_signing_key"` // hex(SHA-256(secret)) — HMAC key for X-GoClaw-Signature
+	Secret         string     `json:"secret"`           // raw secret — shown ONCE; use this as HMAC key
+	HMACSigningKey string     `json:"hmac_signing_key"` // same as Secret — raw bytes for X-GoClaw-Signature
 	Scopes         []string   `json:"scopes"`
 	ChannelID      *uuid.UUID `json:"channel_id,omitempty"`
 	RateLimitPerMin int       `json:"rate_limit_per_min"`
@@ -96,6 +106,15 @@ type webhookCreateResp struct {
 
 func (h *WebhooksAdminHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
 	locale := extractLocale(r)
+
+	// Defense-in-depth: primary guard is skip-mount in gateway_http_wiring.go.
+	// This secondary guard protects if the handler is ever wired without an encKey
+	// (e.g. test harness or future refactor that bypasses the wiring guard).
+	if h.encKey == "" {
+		slog.Error("security.webhook.admin_no_enc_key", "action", "create")
+		writeError(w, http.StatusServiceUnavailable, protocol.ErrInternal, i18n.T(locale, i18n.MsgWebhookEncryptionUnavailable))
+		return
+	}
 
 	if !requireTenantAdmin(w, r, h.tenants) {
 		slog.Warn("security.webhook.admin_denied", "action", "create", "path", r.URL.Path,
@@ -140,6 +159,14 @@ func (h *WebhooksAdminHandler) handleCreate(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// Encrypt raw secret at rest. If encKey is empty, encryptedSecret is "" (requires rotation).
+	encryptedSecret, encErr := crypto.Encrypt(raw, h.encKey)
+	if encErr != nil {
+		slog.Error("webhook.admin.secret_encrypt_failed", "error", encErr)
+		writeError(w, http.StatusInternalServerError, protocol.ErrInternal, i18n.T(locale, i18n.MsgInternalError, "secret encryption"))
+		return
+	}
+
 	ctx := r.Context()
 	tenantID := store.TenantIDFromContext(ctx)
 	now := time.Now()
@@ -152,6 +179,7 @@ func (h *WebhooksAdminHandler) handleCreate(w http.ResponseWriter, r *http.Reque
 		Kind:            req.Kind,
 		SecretPrefix:    secretPrefix,
 		SecretHash:      secretHash,
+		EncryptedSecret: encryptedSecret,
 		Scopes:          req.Scopes,
 		ChannelID:       req.ChannelID,
 		RateLimitPerMin: req.RateLimitPerMin,
@@ -187,7 +215,7 @@ func (h *WebhooksAdminHandler) handleCreate(w http.ResponseWriter, r *http.Reque
 		Kind:            wh.Kind,
 		SecretPrefix:    wh.SecretPrefix,
 		Secret:          raw,
-		HMACSigningKey:  secretHash, // hex(SHA-256(raw)) — use as HMAC key bytes for X-GoClaw-Signature
+		HMACSigningKey:  raw, // raw secret bytes are the HMAC key (encrypted at rest; decrypted at sign time)
 		Scopes:          wh.Scopes,
 		ChannelID:       wh.ChannelID,
 		RateLimitPerMin: wh.RateLimitPerMin,
@@ -375,6 +403,14 @@ func (h *WebhooksAdminHandler) handleUpdate(w http.ResponseWriter, r *http.Reque
 func (h *WebhooksAdminHandler) handleRotate(w http.ResponseWriter, r *http.Request) {
 	locale := extractLocale(r)
 
+	// Defense-in-depth: same guard as handleCreate — encryption key must be present
+	// before we generate and persist a new secret.
+	if h.encKey == "" {
+		slog.Error("security.webhook.admin_no_enc_key", "action", "rotate")
+		writeError(w, http.StatusServiceUnavailable, protocol.ErrInternal, i18n.T(locale, i18n.MsgWebhookEncryptionUnavailable))
+		return
+	}
+
 	if !requireTenantAdmin(w, r, h.tenants) {
 		slog.Warn("security.webhook.admin_denied", "action", "rotate", "path", r.URL.Path,
 			"user_id", store.UserIDFromContext(r.Context()))
@@ -407,7 +443,14 @@ func (h *WebhooksAdminHandler) handleRotate(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	if err := h.webhooks.RotateSecret(ctx, id, newHash, newPrefix); err != nil {
+	newEncryptedSecret, encErr := crypto.Encrypt(raw, h.encKey)
+	if encErr != nil {
+		slog.Error("webhook.admin.secret_encrypt_failed", "error", encErr)
+		writeError(w, http.StatusInternalServerError, protocol.ErrInternal, i18n.T(locale, i18n.MsgInternalError, "secret encryption"))
+		return
+	}
+
+	if err := h.webhooks.RotateSecret(ctx, id, newHash, newPrefix, newEncryptedSecret); err != nil {
 		slog.Error("webhook.admin.rotate_failed", "error", err, "id", id)
 		writeError(w, http.StatusInternalServerError, protocol.ErrInternal, i18n.T(locale, i18n.MsgInternalError, "rotate secret"))
 		return
@@ -420,8 +463,8 @@ func (h *WebhooksAdminHandler) handleRotate(w http.ResponseWriter, r *http.Reque
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"id":               id,
-		"secret":           raw,             // new raw secret — shown ONCE
-		"hmac_signing_key": newHash,         // hex(SHA-256(new_secret))
+		"secret":           raw,    // new raw secret — shown ONCE; use as HMAC key
+		"hmac_signing_key": raw,    // same as secret; raw bytes are HMAC key (encrypted at rest)
 		"secret_prefix":    newPrefix,
 	})
 }

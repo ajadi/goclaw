@@ -163,6 +163,8 @@ func (d *gatewayDeps) runLifecycle(
 				PerTenantConcurrency: 4,
 			},
 		)
+		// K6: decrypt raw secret for outbound HMAC signing using the same key as inbound verify.
+		ww.SetEncKey(os.Getenv("GOCLAW_ENCRYPTION_KEY"))
 		var workerCtx context.Context
 		workerCtx, webhookWorkerCancel = context.WithCancel(ctx)
 		go ww.Run(workerCtx)

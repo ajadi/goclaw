@@ -109,7 +109,7 @@ func (s *adminWebhookStore) Update(_ context.Context, id uuid.UUID, updates map[
 	return nil
 }
 
-func (s *adminWebhookStore) RotateSecret(_ context.Context, id uuid.UUID, newHash, newPrefix string) error {
+func (s *adminWebhookStore) RotateSecret(_ context.Context, id uuid.UUID, newHash, newPrefix, newEncryptedSecret string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	row, ok := s.rows[id]
@@ -118,6 +118,7 @@ func (s *adminWebhookStore) RotateSecret(_ context.Context, id uuid.UUID, newHas
 	}
 	row.SecretHash = newHash
 	row.SecretPrefix = newPrefix
+	row.EncryptedSecret = newEncryptedSecret
 	row.UpdatedAt = time.Now()
 	return nil
 }
@@ -135,6 +136,15 @@ func (s *adminWebhookStore) Revoke(_ context.Context, id uuid.UUID) error {
 }
 
 func (s *adminWebhookStore) TouchLastUsed(_ context.Context, _ uuid.UUID) error { return nil }
+
+// GetByHashUnscoped and GetByIDUnscoped are auth-middleware-only unscoped lookups.
+// In admin tests the middleware is not exercised, so these are no-ops.
+func (s *adminWebhookStore) GetByHashUnscoped(ctx context.Context, h string) (*store.WebhookData, error) {
+	return s.GetByHash(ctx, h)
+}
+func (s *adminWebhookStore) GetByIDUnscoped(ctx context.Context, id uuid.UUID) (*store.WebhookData, error) {
+	return s.GetByID(ctx, id)
+}
 
 // ---- stub TenantStore for admin tests ----
 // Delegates GetUserRole to a configurable map; stubs everything else.
@@ -202,8 +212,13 @@ func ownerCtx() context.Context {
 	return ctx
 }
 
+// testAdminEncKey is a 32-byte (256-bit) AES key used only in tests.
+const testAdminEncKey = "00000000000000000000000000000000"
+
 func newAdminHandler(ws *adminWebhookStore, ts *adminTenantStore) *WebhooksAdminHandler {
-	return NewWebhooksAdminHandler(ws, ts, nil)
+	h := NewWebhooksAdminHandler(ws, ts, nil)
+	h.SetEncKey(testAdminEncKey) // required since K6 guard rejects empty encKey
+	return h
 }
 
 func doRequest(t *testing.T, h *WebhooksAdminHandler, method, path string, body any, ctx context.Context) *httptest.ResponseRecorder {

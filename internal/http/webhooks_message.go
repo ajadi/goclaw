@@ -38,6 +38,7 @@ type WebhookMessageHandler struct {
 	callStore        store.WebhookCallStore
 	webhooks         store.WebhookStore
 	limiter          *webhookLimiter
+	encKey           string // AES-256-GCM key for decrypting encrypted_secret at HMAC verify time
 }
 
 // NewWebhookMessageHandler constructs a WebhookMessageHandler.
@@ -58,6 +59,11 @@ func NewWebhookMessageHandler(
 	}
 }
 
+// SetEncKey sets the AES-256-GCM encryption key for decrypting webhook secrets at HMAC verify time.
+func (h *WebhookMessageHandler) SetEncKey(encKey string) {
+	h.encKey = encKey
+}
+
 // RegisterRoutes mounts POST /v1/webhooks/message wrapped in the auth middleware.
 // Only call when edition.Current().AllowsChannels() — callers enforce the gate.
 func (h *WebhookMessageHandler) RegisterRoutes(mux *http.ServeMux) {
@@ -65,6 +71,7 @@ func (h *WebhookMessageHandler) RegisterRoutes(mux *http.ServeMux) {
 		h.webhooks,
 		h.callStore,
 		h.limiter,
+		h.encKey,
 		"message",
 		WebhookMaxBodyMessage,
 	)
@@ -376,16 +383,14 @@ func (h *WebhookMessageHandler) newCallRecord(
 	channelName string,
 	req webhookMessageReq,
 ) *store.WebhookCallData {
-	// Encode a hash-prefixed payload so idempotency replay can verify body identity.
+	// Encode canonical audit payload: {"body_hash": "<sha256>", "meta": {...}}.
+	// PG jsonb rejects non-JSON bytes; this shape is valid JSON on both PG and SQLite.
 	bodyBytes, _ := json.Marshal(req)
-	bodyHash := sha256Hex(bodyBytes)
-	auditMeta, _ := json.Marshal(map[string]any{
+	requestPayload, _ := buildAuditPayload(bodyBytes, map[string]any{
 		"channel_name": channelName,
 		"chat_id":      req.ChatID,
 		"has_media":    req.MediaURL != "",
 	})
-	// First 64 bytes = hex SHA-256 of body; rest = human-readable summary.
-	requestPayload := append([]byte(bodyHash), auditMeta...)
 
 	call := &store.WebhookCallData{
 		ID:             callID,

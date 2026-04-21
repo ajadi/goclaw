@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"log/slog"
+	"os"
 	"time"
 
 	"github.com/nextlevelbuilder/goclaw/internal/audio"
@@ -150,50 +151,69 @@ func (d *gatewayDeps) wireHTTPHandlersOnServer(
 		httpapi.InitAPIKeyCache(d.pgStores.APIKeys, d.msgBus)
 	}
 
-	// Webhook admin CRUD — available in all editions (Standard + Lite).
-	// Runtime routes (/v1/webhooks/message, /v1/webhooks/llm) are mounted by phases 05/06.
-	if d.pgStores != nil && d.pgStores.Webhooks != nil {
-		d.server.SetWebhooksAdminHandler(httpapi.NewWebhooksAdminHandler(
-			d.pgStores.Webhooks,
-			d.pgStores.Tenants,
-			d.msgBus,
-		))
-	}
+	// K10: single shared webhookLimiter — one per process enforces per-tenant RPM cap across
+	// both LLM and message endpoints. Two separate instances would double the effective cap.
+	webhookEncKey := os.Getenv("GOCLAW_ENCRYPTION_KEY")
 
-	// Webhook message endpoint — Standard edition only (channels required).
-	// Phase 05b: POST /v1/webhooks/message → sync channel send (text + optional media).
-	if edition.Current().AllowsChannels() &&
-		d.pgStores != nil &&
-		d.pgStores.Webhooks != nil &&
-		d.pgStores.WebhookCalls != nil &&
-		d.pgStores.ChannelInstances != nil &&
-		d.channelMgr != nil {
-		whl := httpapi.NewWebhookLimiter()
-		d.server.SetWebhookMessageHandler(httpapi.NewWebhookMessageHandler(
-			d.channelMgr,
-			d.pgStores.ChannelInstances,
-			d.pgStores.WebhookCalls,
-			d.pgStores.Webhooks,
-			whl,
-		))
-	}
+	// K6: refuse to mount any webhook handler when GOCLAW_ENCRYPTION_KEY is unset.
+	// crypto.Encrypt("", "") returns plaintext unchanged, so an empty key would silently
+	// persist raw secrets to the database — defeating the stated DB-leak protection.
+	// Skip-mount approach: process still starts (all other subsystems work), but
+	// /v1/webhooks/* returns 404. Set GOCLAW_ENCRYPTION_KEY to re-enable webhooks.
+	if webhookEncKey == "" {
+		slog.Error("webhook subsystem disabled: GOCLAW_ENCRYPTION_KEY not set. Set the env var to enable /v1/webhooks/* endpoints.")
+	} else {
+		sharedWebhookLimiter := httpapi.NewWebhookLimiter()
 
-	// Webhook LLM endpoint — all editions (Standard + Lite).
-	// Phase 06: POST /v1/webhooks/llm → sync agent run (≤30s) or async enqueue.
-	// LocalhostOnly enforcement is handled by WebhookAuthMiddleware at request time.
-	// lane=nil → handler self-creates internal default lane (4-slot).
-	if d.pgStores != nil &&
-		d.pgStores.Webhooks != nil &&
-		d.pgStores.WebhookCalls != nil &&
-		d.agentRouter != nil {
-		llmLimiter := httpapi.NewWebhookLimiter()
-		d.server.SetWebhookLLMHandler(httpapi.NewWebhookLLMHandler(
-			d.agentRouter,
-			d.pgStores.WebhookCalls,
-			d.pgStores.Webhooks,
-			llmLimiter,
-			nil, // lane: nil → internal default (4-slot); configurable in future via cfg
-		))
+		// Webhook admin CRUD — available in all editions (Standard + Lite).
+		// Runtime routes (/v1/webhooks/message, /v1/webhooks/llm) are mounted by phases 05/06.
+		if d.pgStores != nil && d.pgStores.Webhooks != nil {
+			adminH := httpapi.NewWebhooksAdminHandler(
+				d.pgStores.Webhooks,
+				d.pgStores.Tenants,
+				d.msgBus,
+			)
+			adminH.SetEncKey(webhookEncKey)
+			d.server.SetWebhooksAdminHandler(adminH)
+		}
+
+		// Webhook message endpoint — Standard edition only (channels required).
+		// Phase 05b: POST /v1/webhooks/message → sync channel send (text + optional media).
+		if edition.Current().AllowsChannels() &&
+			d.pgStores != nil &&
+			d.pgStores.Webhooks != nil &&
+			d.pgStores.WebhookCalls != nil &&
+			d.pgStores.ChannelInstances != nil &&
+			d.channelMgr != nil {
+			msgH := httpapi.NewWebhookMessageHandler(
+				d.channelMgr,
+				d.pgStores.ChannelInstances,
+				d.pgStores.WebhookCalls,
+				d.pgStores.Webhooks,
+				sharedWebhookLimiter, // K10: shared limiter
+			)
+			msgH.SetEncKey(webhookEncKey) // K6: decrypt secret at HMAC verify time
+			d.server.SetWebhookMessageHandler(msgH)
+		}
+
+		// Webhook LLM endpoint — all editions (Standard + Lite).
+		// Phase 06: POST /v1/webhooks/llm → sync agent run (≤30s) or async enqueue.
+		// LocalhostOnly enforcement is handled by WebhookAuthMiddleware at request time.
+		// lane=nil → handler self-creates internal default lane (4-slot).
+		if d.pgStores != nil &&
+			d.pgStores.Webhooks != nil &&
+			d.pgStores.WebhookCalls != nil &&
+			d.agentRouter != nil {
+			llmH := httpapi.NewWebhookLLMHandler(
+				d.agentRouter,
+				d.pgStores.WebhookCalls,
+				d.pgStores.Webhooks,
+				sharedWebhookLimiter, // K10: shared limiter
+				nil,                  // lane: nil → internal default (4-slot); configurable in future via cfg
+			)
+			llmH.SetEncKey(webhookEncKey) // K6: decrypt secret at HMAC verify time
+			d.server.SetWebhookLLMHandler(llmH)
+		}
 	}
 
 	// Allow browser-paired users to access HTTP APIs

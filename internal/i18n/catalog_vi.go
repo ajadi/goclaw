@@ -235,6 +235,8 @@ func init() {
 		MsgWebhookLaneSaturated:           "làn xử lý webhook đã đầy",
 		MsgWebhookLocalhostOnlyViolation:  "webhook này chỉ cho phép gọi từ localhost",
 		MsgWebhookMediaChannelUnsupported: "kênh không hỗ trợ tệp đính kèm media",
+		MsgWebhookIPDenied:                "địa chỉ IP không nằm trong danh sách cho phép",
+		MsgWebhookEncryptionUnavailable:   "khóa mã hóa webhook chưa được cấu hình; hãy đặt GOCLAW_ENCRYPTION_KEY để kích hoạt webhook",
 
 		// Hooks
 		MsgHookInvalidMatcher:          "biểu thức regex matcher không hợp lệ: %s",

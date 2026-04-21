@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -51,13 +52,14 @@ func checkIdempotency(
 		return true, nil
 	}
 
-	// Prior call found — check body hash stored in request_payload prefix.
-	// We store body hash as the first 64 bytes of request_payload (hex SHA-256).
-	// If request_payload is nil or shorter, treat as no-match (edge case for
-	// very old records or non-body calls).
+	// Prior call found — check body hash stored in request_payload JSON.
+	// Post-K2 all producers emit {"body_hash":"<64-hex>","meta":{...}}.
+	// Fail-closed: empty storedHash (malformed row) is treated as mismatch → 409.
+	// This prevents a corrupt or tampered stored row from serving as a replay vehicle
+	// for arbitrary request bodies.
 	storedHash := extractBodyHash(existing.RequestPayload)
-	if storedHash != "" && storedHash != bodyHash {
-		// Same key, different body → 409 Conflict.
+	if storedHash != bodyHash {
+		// Same key, different (or unverifiable) body → 409 Conflict.
 		writeJSON(w, http.StatusConflict, map[string]string{
 			"error": i18n.T(locale, i18n.MsgWebhookIdempotencyConflict),
 		})
@@ -88,18 +90,29 @@ func sha256Hex(b []byte) string {
 	return hex.EncodeToString(h[:])
 }
 
-// extractBodyHash reads the first 64 bytes of payload as a hex SHA-256 hash.
-// Returns "" when payload is absent or shorter than 64 bytes (not a hash prefix).
+// extractBodyHash parses the canonical audit payload JSON and returns body_hash.
+// Expected shape: {"body_hash": "<sha256-hex-64-chars>", "meta": {...}}.
+//
+// Fail-closed: returns "" on any parse failure or if body_hash is not exactly
+// 64 lowercase hex characters — preventing hash bypass via malformed payloads.
 func extractBodyHash(payload []byte) string {
-	if len(payload) < 64 {
+	if len(payload) == 0 {
 		return ""
 	}
-	candidate := string(payload[:64])
-	// Validate it looks like a hex string before returning.
-	for _, c := range candidate {
+	var p struct {
+		BodyHash string `json:"body_hash"`
+	}
+	if err := json.Unmarshal(payload, &p); err != nil {
+		return ""
+	}
+	if len(p.BodyHash) != 64 {
+		return ""
+	}
+	// Validate all characters are lowercase hex — reject any non-hex payload.
+	for _, c := range p.BodyHash {
 		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
 			return ""
 		}
 	}
-	return candidate
+	return p.BodyHash
 }

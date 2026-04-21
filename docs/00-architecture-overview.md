@@ -591,12 +591,16 @@ POST /v1/webhooks/llm or /v1/webhooks/message
 
 ```
 WebhookWorker.pollOneTenant()
-  → calls.ClaimNext() → execute goroutine
+  → calls.ClaimNext(lease_token CAS) → execute goroutine
   → invokeAgent (30s) → build callbackPayload
   → SSRF re-validate callback_url
   → HMAC sign body → POST to callback_url
-  → 2xx: done | 4xx: failed | 5xx/net: retry with backoff | 429: Retry-After
+  → 2xx: UpdateStatus(done, lease_token) | 4xx: failed | 5xx/net: retry with backoff | 429: Retry-After
 ```
+
+**Lease Token Idempotency:** Each call row has a `lease_token` (UUID). Worker claims the row only if it can CAS the token. On success, worker updates status with the token as proof of ownership. Stale/slow receivers cannot accidentally overwrite a faster delivery attempt.
+
+**Secret Encryption:** The raw webhook secret is encrypted at rest via AES-256-GCM using the `GOCLAW_ENCRYPTION_KEY` environment variable (same key as LLM provider credentials). Database leaks do not compromise HMAC material. See `docs/webhooks.md` § 14 for details.
 
 ### Security Log Events
 

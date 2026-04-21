@@ -12,7 +12,7 @@ CREATE TABLE webhooks (
     name                text        NOT NULL,
     kind                text        NOT NULL CHECK (kind IN ('llm', 'message')),
     secret_prefix       text,
-    secret_hash         text(64)    NOT NULL,
+    secret_hash         text        NOT NULL,
     scopes              text[]      NOT NULL DEFAULT '{}',
     channel_id          uuid,
     rate_limit_per_min  int         NOT NULL DEFAULT 60,

@@ -64,6 +64,9 @@ func (s *llmCallStore) GetByIdempotency(_ context.Context, _ uuid.UUID, _ string
 func (s *llmCallStore) UpdateStatus(_ context.Context, _ uuid.UUID, _ map[string]any) error {
 	return nil
 }
+func (s *llmCallStore) UpdateStatusCAS(_ context.Context, _ uuid.UUID, _ string, _ map[string]any) error {
+	return nil
+}
 func (s *llmCallStore) ClaimNext(_ context.Context, _ uuid.UUID, _ time.Time) (*store.WebhookCallData, error) {
 	return nil, nil
 }

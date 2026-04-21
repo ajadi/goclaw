@@ -1663,8 +1663,9 @@ CREATE TABLE IF NOT EXISTS tenant_hook_budget (
 );
 
 -- ============================================================
--- Table: webhooks  (registry, migration 000056)
--- secret_hash stores SHA-256 hex; raw secret returned only once on create.
+-- Table: webhooks  (registry, migration 000056 + 000058)
+-- secret_hash stores SHA-256 hex; used only for bearer-token lookup.
+-- encrypted_secret stores AES-256-GCM(raw_secret, GOCLAW_ENCRYPTION_KEY); decrypted at HMAC sign time.
 -- scopes + ip_allowlist stored as JSON arrays (TEXT) — no native array type.
 -- ============================================================
 
@@ -1676,6 +1677,7 @@ CREATE TABLE IF NOT EXISTS webhooks (
     kind                TEXT        NOT NULL CHECK (kind IN ('llm', 'message')),
     secret_prefix       TEXT,
     secret_hash         TEXT        NOT NULL,
+    encrypted_secret    TEXT        NOT NULL DEFAULT '',
     scopes              TEXT        NOT NULL DEFAULT '[]',
     channel_id          TEXT,
     rate_limit_per_min  INTEGER     NOT NULL DEFAULT 60,
@@ -1698,9 +1700,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_webhooks_secret
     WHERE revoked = 0;
 
 -- ============================================================
--- Table: webhook_calls  (audit + async state, migration 000056)
--- request_payload + response stored as BLOB (truncated at 32 KB by writer).
+-- Table: webhook_calls  (audit + async state, migration 000056 + 000057)
+-- request_payload stored as TEXT (canonical JSON: {"body_hash":"...","meta":{...}}).
+-- response stored as TEXT (JSON). BLOB would silently accept non-JSON; TEXT enforces
+-- that callers write valid JSON, matching PG's jsonb column behaviour.
 -- delivery_id: stable UUID across outbound retries; emitted as X-Webhook-Delivery-Id.
+-- lease_token: random UUID set by ClaimNext; guards UpdateStatusCAS for exactly-once delivery.
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS webhook_calls (
@@ -1716,8 +1721,9 @@ CREATE TABLE IF NOT EXISTS webhook_calls (
     delivery_id      TEXT     NOT NULL,
     next_attempt_at  TEXT,
     started_at       TEXT,
-    request_payload  BLOB,
-    response         BLOB,
+    lease_token      TEXT,
+    request_payload  TEXT,
+    response         TEXT,
     last_error       TEXT,
     created_at       TEXT     NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     completed_at     TEXT

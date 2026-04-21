@@ -102,6 +102,9 @@ func (s *msgCallStore) GetByID(_ context.Context, _ uuid.UUID) (*store.WebhookCa
 func (s *msgCallStore) GetByIdempotency(_ context.Context, _ uuid.UUID, _ string) (*store.WebhookCallData, error) {
 	return nil, sql.ErrNoRows
 }
+func (s *msgCallStore) UpdateStatusCAS(_ context.Context, _ uuid.UUID, _ string, _ map[string]any) error {
+	return nil
+}
 func (s *msgCallStore) UpdateStatus(_ context.Context, _ uuid.UUID, _ map[string]any) error {
 	return nil
 }
@@ -137,11 +140,17 @@ func (s *msgWebhookStore) List(_ context.Context, _ store.WebhookListFilter) ([]
 func (s *msgWebhookStore) Update(_ context.Context, _ uuid.UUID, _ map[string]any) error {
 	return nil
 }
-func (s *msgWebhookStore) RotateSecret(_ context.Context, _ uuid.UUID, _, _ string) error {
+func (s *msgWebhookStore) RotateSecret(_ context.Context, _ uuid.UUID, _, _, _ string) error {
 	return nil
 }
 func (s *msgWebhookStore) Revoke(_ context.Context, _ uuid.UUID) error        { return nil }
 func (s *msgWebhookStore) TouchLastUsed(_ context.Context, _ uuid.UUID) error { return nil }
+func (s *msgWebhookStore) GetByHashUnscoped(_ context.Context, _ string) (*store.WebhookData, error) {
+	return nil, sql.ErrNoRows
+}
+func (s *msgWebhookStore) GetByIDUnscoped(_ context.Context, _ uuid.UUID) (*store.WebhookData, error) {
+	return nil, sql.ErrNoRows
+}
 
 // ---- stub: store.ChannelInstanceStore ----
 

@@ -25,7 +25,7 @@ func NewPGWebhookStore(db *sql.DB) *PGWebhookStore {
 }
 
 // webhookColumns is the canonical SELECT column list for webhooks.
-const webhookColumns = `id, tenant_id, agent_id, name, kind, secret_prefix, secret_hash,
+const webhookColumns = `id, tenant_id, agent_id, name, kind, secret_prefix, secret_hash, encrypted_secret,
 	scopes, channel_id, rate_limit_per_min, ip_allowlist,
 	require_hmac, localhost_only, revoked, created_by,
 	created_at, updated_at, last_used_at`
@@ -43,7 +43,7 @@ func scanWebhookRow(row interface {
 
 	err := row.Scan(
 		&w.ID, &w.TenantID, &agentID,
-		&w.Name, &w.Kind, &secretPrefix, &w.SecretHash,
+		&w.Name, &w.Kind, &secretPrefix, &w.SecretHash, &w.EncryptedSecret,
 		&scopesRaw, &channelID, &w.RateLimitPerMin, &ipAllowlistRaw,
 		&w.RequireHMAC, &w.LocalhostOnly, &w.Revoked, &createdBy,
 		&w.CreatedAt, &w.UpdatedAt, &w.LastUsedAt,
@@ -67,12 +67,12 @@ func scanWebhookRow(row interface {
 func (s *PGWebhookStore) Create(ctx context.Context, w *store.WebhookData) error {
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO webhooks
-		 (id, tenant_id, agent_id, name, kind, secret_prefix, secret_hash,
+		 (id, tenant_id, agent_id, name, kind, secret_prefix, secret_hash, encrypted_secret,
 		  scopes, channel_id, rate_limit_per_min, ip_allowlist,
 		  require_hmac, localhost_only, revoked, created_by, created_at, updated_at)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
 		w.ID, w.TenantID, nilUUID(w.AgentID),
-		w.Name, w.Kind, nilStr(w.SecretPrefix), w.SecretHash,
+		w.Name, w.Kind, nilStr(w.SecretPrefix), w.SecretHash, w.EncryptedSecret,
 		pqStringArray(w.Scopes), nilUUID(w.ChannelID), w.RateLimitPerMin, pqStringArray(w.IPAllowlist),
 		w.RequireHMAC, w.LocalhostOnly, w.Revoked,
 		nilStr(w.CreatedBy), w.CreatedAt, w.UpdatedAt,
@@ -104,6 +104,31 @@ func (s *PGWebhookStore) GetByHash(ctx context.Context, secretHash string) (*sto
 		 FROM webhooks
 		 WHERE secret_hash = $1 AND tenant_id = $2 AND NOT revoked`,
 		secretHash, tid,
+	)
+	return scanWebhookRow(row)
+}
+
+// GetByHashUnscoped looks up a webhook by secret_hash without a tenant filter.
+// Intended only for WebhookAuthMiddleware pre-auth resolution before tenant context
+// has been established. Downstream queries must remain tenant-scoped.
+func (s *PGWebhookStore) GetByHashUnscoped(ctx context.Context, secretHash string) (*store.WebhookData, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT `+webhookColumns+`
+		 FROM webhooks
+		 WHERE secret_hash = $1 AND NOT revoked`,
+		secretHash,
+	)
+	return scanWebhookRow(row)
+}
+
+// GetByIDUnscoped looks up a webhook by UUID without a tenant filter.
+// Intended only for WebhookAuthMiddleware HMAC pre-auth resolution.
+func (s *PGWebhookStore) GetByIDUnscoped(ctx context.Context, id uuid.UUID) (*store.WebhookData, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT `+webhookColumns+`
+		 FROM webhooks
+		 WHERE id = $1`,
+		id,
 	)
 	return scanWebhookRow(row)
 }
@@ -157,15 +182,15 @@ func (s *PGWebhookStore) Update(ctx context.Context, id uuid.UUID, updates map[s
 	return execMapUpdateWhereTenant(ctx, s.db, "webhooks", updates, id, tid)
 }
 
-func (s *PGWebhookStore) RotateSecret(ctx context.Context, id uuid.UUID, newSecretHash, newPrefix string) error {
+func (s *PGWebhookStore) RotateSecret(ctx context.Context, id uuid.UUID, newSecretHash, newPrefix, newEncryptedSecret string) error {
 	tid, err := requireTenantID(ctx)
 	if err != nil {
 		return err
 	}
 	res, err := s.db.ExecContext(ctx,
-		`UPDATE webhooks SET secret_hash = $1, secret_prefix = $2, updated_at = $3
-		 WHERE id = $4 AND tenant_id = $5`,
-		newSecretHash, newPrefix, time.Now(), id, tid,
+		`UPDATE webhooks SET secret_hash = $1, secret_prefix = $2, encrypted_secret = $3, updated_at = $4
+		 WHERE id = $5 AND tenant_id = $6`,
+		newSecretHash, newPrefix, newEncryptedSecret, time.Now(), id, tid,
 	)
 	if err != nil {
 		return err

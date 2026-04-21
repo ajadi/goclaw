@@ -238,8 +238,10 @@ const (
 	MsgWebhookCallbackURLInvalid     = "webhook.callback_url_invalid"     // "callback URL is invalid or blocked"
 	MsgWebhookLLMTimeout             = "webhook.llm_timeout"              // "LLM processing timed out"
 	MsgWebhookLaneSaturated          = "webhook.lane_saturated"           // "webhook processing lane is at capacity"
-	MsgWebhookLocalhostOnlyViolation = "webhook.localhost_only_violation" // "this webhook is restricted to localhost callers"
+	MsgWebhookLocalhostOnlyViolation  = "webhook.localhost_only_violation"  // "this webhook is restricted to localhost callers"
 	MsgWebhookMediaChannelUnsupported = "webhook.media_channel_unsupported" // "channel does not support media attachments"
+	MsgWebhookIPDenied                = "webhook.ip_denied"                 // "request origin is not in the IP allowlist"
+	MsgWebhookEncryptionUnavailable   = "webhook.encryption_unavailable"    // "webhook encryption key not configured; set GOCLAW_ENCRYPTION_KEY to enable webhooks"
 
 	// --- Hooks ---
 	MsgHookInvalidMatcher          = "hook.invalid_matcher"           // "invalid matcher regex: %s"

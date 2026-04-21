@@ -10,7 +10,6 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,6 +24,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/nextlevelbuilder/goclaw/internal/agent"
+	"github.com/nextlevelbuilder/goclaw/internal/crypto"
 	"github.com/nextlevelbuilder/goclaw/internal/security"
 	"github.com/nextlevelbuilder/goclaw/internal/store"
 )
@@ -110,12 +110,15 @@ type WorkerConfig struct {
 //   - Retention prune (hourly ticker)
 //   - CallbackLimiter (per-tenant concurrency cap)
 type WebhookWorker struct {
-	calls      store.WebhookCallStore
-	webhooks   store.WebhookStore
-	tenants    store.TenantStore
-	router     *agent.Router
-	limiter    *CallbackLimiter
-	cfg        WorkerConfig
+	calls    store.WebhookCallStore
+	webhooks store.WebhookStore
+	tenants  store.TenantStore
+	router   *agent.Router
+	limiter  *CallbackLimiter
+	cfg      WorkerConfig
+	// encKey is the AES-256-GCM key used to decrypt webhook.encrypted_secret at HMAC sign time.
+	// Sourced from GOCLAW_ENCRYPTION_KEY env var. Empty string disables outbound HMAC signing.
+	encKey string
 
 	// inFlight tracks active delivery goroutines for graceful drain.
 	inFlight sync.WaitGroup
@@ -144,6 +147,12 @@ func NewWebhookWorker(
 		limiter:  limiter,
 		cfg:      cfg,
 	}
+}
+
+// SetEncKey configures the AES-256-GCM decryption key for outbound HMAC signing.
+// Must be called before Run() if webhooks use HMAC auth.
+func (w *WebhookWorker) SetEncKey(encKey string) {
+	w.encKey = encKey
 }
 
 // Run starts the worker loop. It blocks until ctx is cancelled, then drains in-flight
@@ -194,22 +203,26 @@ func (w *WebhookWorker) Run(ctx context.Context) {
 				continue
 			}
 
+			// slotRelease is passed into the goroutine — the goroutine MUST call it on exit.
+			// K4: without this closure the slot is never returned, causing the worker to
+			// wedge after WorkerConcurrency deliveries (1 on SQLite/Lite).
+			slotRelease := func() { <-slotCh }
+
 			// Scan each active tenant for a claimable row.
-			claimed := w.pollOneTenant(ctx)
+			claimed := w.pollOneTenant(ctx, slotRelease)
 			if !claimed {
-				<-slotCh // no work found; release slot immediately
-				continue
+				// No work found — release the slot we just acquired.
+				slotRelease()
 			}
-			// Slot was taken; the goroutine launched by pollOneTenant will release it
-			// via the slotRelease function passed down.
-			// We pass slotCh release into the goroutine below.
+			// If claimed=true, the goroutine launched by pollOneTenant owns slotRelease.
 		}
 	}
 }
 
 // pollOneTenant iterates active tenants and claims+dispatches the first available row.
+// slotRelease must be called by the launched goroutine (K4 fix: prevents slot drain).
 // Returns true if a delivery goroutine was launched (slot consumed), false otherwise.
-func (w *WebhookWorker) pollOneTenant(ctx context.Context) bool {
+func (w *WebhookWorker) pollOneTenant(ctx context.Context, slotRelease func()) bool {
 	tenantList, err := w.tenants.ListTenants(ctx)
 	if err != nil {
 		slog.Error("webhook.worker.list_tenants_failed", "error", err)
@@ -235,22 +248,29 @@ func (w *WebhookWorker) pollOneTenant(ctx context.Context) bool {
 			continue
 		}
 
+		// Extract lease token set by ClaimNext (K5: CAS guard for UpdateStatusCAS).
+		lease := ""
+		if call.LeaseToken != nil {
+			lease = *call.LeaseToken
+		}
+
 		// Try per-tenant concurrency cap (non-blocking).
 		tenantIDStr := tenant.ID.String()
 		if !w.limiter.TryAcquire(tenantIDStr) {
 			// Tenant is at cap. Reset row to queued so the next poll can retry.
-			// We leave the row untouched (status=running from ClaimNext) and reset it.
 			w.resetToQueued(ctx, call, tenant.ID, "tenant_concurrency_cap")
 			return false
 		}
 
 		// Dispatch delivery goroutine.
+		// K4: slotRelease is called in defer so the semaphore slot is always returned.
 		callCopy := *call
 		w.inFlight.Add(1)
 		go func() {
+			defer slotRelease() // K4: release semaphore slot on goroutine exit
 			defer w.inFlight.Done()
 			defer w.limiter.Release(tenantIDStr)
-			w.execute(ctx, &callCopy, tenant.ID)
+			w.execute(ctx, &callCopy, tenant.ID, lease)
 		}()
 		return true
 	}
@@ -259,7 +279,8 @@ func (w *WebhookWorker) pollOneTenant(ctx context.Context) bool {
 
 // execute is the per-row delivery pipeline. It runs in a goroutine and is
 // protected by a defer recover() to prevent worker crashes from one bad row.
-func (w *WebhookWorker) execute(ctx context.Context, call *store.WebhookCallData, tenantID uuid.UUID) {
+// lease is the token returned by ClaimNext; used for optimistic-concurrency (K5).
+func (w *WebhookWorker) execute(ctx context.Context, call *store.WebhookCallData, tenantID uuid.UUID, lease string) {
 	defer func() {
 		if r := recover(); r != nil {
 			slog.Error("security.webhook.worker_panic",
@@ -267,7 +288,7 @@ func (w *WebhookWorker) execute(ctx context.Context, call *store.WebhookCallData
 				"delivery_id", call.DeliveryID,
 				"panic", r,
 			)
-			w.updateRetry(ctx, call, tenantID, fmt.Sprintf("panic: %v", r))
+			w.updateRetry(ctx, call, tenantID, lease, fmt.Sprintf("panic: %v", r))
 		}
 	}()
 
@@ -280,7 +301,7 @@ func (w *WebhookWorker) execute(ctx context.Context, call *store.WebhookCallData
 			"call_id", call.ID,
 			"error", err,
 		)
-		w.updateFailed(tctx, call, tenantID, "payload decode error: "+err.Error())
+		w.updateFailed(tctx, call, tenantID, lease, "payload decode error: "+err.Error())
 		return
 	}
 
@@ -314,7 +335,7 @@ func (w *WebhookWorker) execute(ctx context.Context, call *store.WebhookCallData
 	// Resolve callback_url.
 	if call.CallbackURL == nil || *call.CallbackURL == "" {
 		slog.Error("webhook.worker.no_callback_url", "call_id", call.ID)
-		w.updateFailed(tctx, call, tenantID, "no callback_url")
+		w.updateFailed(tctx, call, tenantID, lease, "no callback_url")
 		return
 	}
 	callbackURL := *call.CallbackURL
@@ -327,7 +348,7 @@ func (w *WebhookWorker) execute(ctx context.Context, call *store.WebhookCallData
 			"host", hostOnly(callbackURL),
 			"error", ssrfErr,
 		)
-		w.updateFailed(tctx, call, tenantID, "ssrf: "+ssrfErr.Error())
+		w.updateFailed(tctx, call, tenantID, lease, "ssrf: "+ssrfErr.Error())
 		return
 	}
 
@@ -354,11 +375,11 @@ func (w *WebhookWorker) execute(ctx context.Context, call *store.WebhookCallData
 	bodyBytes, err := json.Marshal(payload)
 	if err != nil {
 		slog.Error("webhook.worker.marshal_failed", "call_id", call.ID, "error", err)
-		w.updateFailed(tctx, call, tenantID, "marshal: "+err.Error())
+		w.updateFailed(tctx, call, tenantID, lease, "marshal: "+err.Error())
 		return
 	}
 
-	// Step 4: Load webhook row to get secret_hash for HMAC signing.
+	// Step 4: Load webhook row for HMAC signing.
 	wh, whErr := w.webhooks.GetByID(tctx, call.WebhookID)
 	if whErr != nil {
 		slog.Error("webhook.worker.load_webhook_failed",
@@ -366,34 +387,47 @@ func (w *WebhookWorker) execute(ctx context.Context, call *store.WebhookCallData
 			"webhook_id", call.WebhookID,
 			"error", whErr,
 		)
-		w.updateRetry(tctx, call, tenantID, "webhook lookup: "+whErr.Error())
+		w.updateRetry(tctx, call, tenantID, lease, "webhook lookup: "+whErr.Error())
 		return
 	}
 
-	// Step 5: HMAC sign the body.
-	sigKey, hexErr := hex.DecodeString(wh.SecretHash)
-	if hexErr != nil {
-		slog.Error("webhook.worker.bad_secret_hash",
+	// Step 5: Decrypt raw secret for HMAC signing (K6).
+	// encrypted_secret holds AES-256-GCM ciphertext; decrypt to get the raw signing key.
+	// Falls back to no HMAC header if encKey is empty (dev/test environments).
+	now := time.Now()
+	var sigHeader string
+	if wh.EncryptedSecret != "" && w.encKey != "" {
+		rawSecret, decErr := crypto.Decrypt(wh.EncryptedSecret, w.encKey)
+		if decErr != nil {
+			slog.Error("webhook.worker.decrypt_secret_failed",
+				"call_id", call.ID,
+				"webhook_id", call.WebhookID,
+				"error", decErr,
+			)
+			w.updateFailed(tctx, call, tenantID, lease, "decrypt secret: "+decErr.Error())
+			return
+		}
+		sigHeader = Sign([]byte(rawSecret), now.Unix(), bodyBytes)
+	} else if wh.EncryptedSecret == "" {
+		slog.Warn("webhook.worker.no_encrypted_secret",
 			"call_id", call.ID,
 			"webhook_id", call.WebhookID,
 		)
-		w.updateFailed(tctx, call, tenantID, "bad secret_hash in DB")
-		return
 	}
-	now := time.Now()
-	sigHeader := Sign(sigKey, now.Unix(), bodyBytes)
 
 	// Step 6: Build and send outbound POST.
 	sendCtx := security.WithPinnedIP(context.WithoutCancel(ctx), pinnedIP)
 	httpReq, reqErr := http.NewRequestWithContext(sendCtx, http.MethodPost, callbackURL, bytes.NewReader(bodyBytes))
 	if reqErr != nil {
-		w.updateRetry(tctx, call, tenantID, "build request: "+reqErr.Error())
+		w.updateRetry(tctx, call, tenantID, lease, "build request: "+reqErr.Error())
 		return
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("User-Agent", "goclaw-webhook/1")
 	httpReq.Header.Set("X-Webhook-Delivery-Id", call.DeliveryID.String())
-	httpReq.Header.Set("X-Webhook-Signature", sigHeader)
+	if sigHeader != "" {
+		httpReq.Header.Set("X-Webhook-Signature", sigHeader)
+	}
 
 	client := security.NewSafeClient(callbackTimeout)
 	resp, doErr := client.Do(httpReq)
@@ -408,7 +442,7 @@ func (w *WebhookWorker) execute(ctx context.Context, call *store.WebhookCallData
 			"attempt", newAttempts,
 			"error", doErr,
 		)
-		w.handleSendError(tctx, call, tenantID, newAttempts, doErr.Error(), nil)
+		w.handleSendError(tctx, call, tenantID, newAttempts, lease, doErr.Error(), nil)
 		return
 	}
 	defer resp.Body.Close()
@@ -423,10 +457,11 @@ func (w *WebhookWorker) execute(ctx context.Context, call *store.WebhookCallData
 	)
 
 	// Step 7: Classify response and update status.
-	w.classifyAndUpdate(tctx, call, tenantID, resp, respBody, bodyBytes, newAttempts, now)
+	w.classifyAndUpdate(tctx, call, tenantID, resp, respBody, bodyBytes, newAttempts, lease, now)
 }
 
 // classifyAndUpdate maps the HTTP response status to a terminal or retry state.
+// lease is used as the CAS guard (K5) for UpdateStatusCAS to prevent double-delivery.
 func (w *WebhookWorker) classifyAndUpdate(
 	ctx context.Context,
 	call *store.WebhookCallData,
@@ -435,16 +470,13 @@ func (w *WebhookWorker) classifyAndUpdate(
 	respBody []byte,
 	sentBody []byte,
 	newAttempts int,
+	lease string,
 	sentAt time.Time,
 ) {
 	code := resp.StatusCode
 	switch {
 	case code >= 200 && code < 300:
 		// Success.
-		truncated := respBody
-		if len(truncated) > callbackResponseStorageLimit {
-			truncated = truncated[:callbackResponseStorageLimit]
-		}
 		// Store the sent payload as the canonical response.
 		storedResp := sentBody
 		if len(storedResp) > callbackResponseStorageLimit {
@@ -457,8 +489,13 @@ func (w *WebhookWorker) classifyAndUpdate(
 			"response":     storedResp,
 			"completed_at": completedAt,
 			"last_error":   nil,
+			"lease_token":  nil, // clear lease on terminal status
 		}
-		if err := w.calls.UpdateStatus(ctx, call.ID, updates); err != nil {
+		if err := w.calls.UpdateStatusCAS(ctx, call.ID, lease, updates); err != nil {
+			if errors.Is(err, store.ErrLeaseExpired) {
+				slog.Warn("webhook.worker.lease_expired_on_done", "call_id", call.ID)
+				return // another process already updated this row — safe to skip
+			}
 			slog.Error("webhook.worker.update_done_failed",
 				"call_id", call.ID,
 				"error", err,
@@ -470,10 +507,7 @@ func (w *WebhookWorker) classifyAndUpdate(
 		delay := DelayFor(newAttempts)
 		if ra := resp.Header.Get("Retry-After"); ra != "" {
 			if secs, err := strconv.ParseInt(strings.TrimSpace(ra), 10, 64); err == nil && secs > 0 {
-				raDelay := time.Duration(secs) * time.Second
-				if raDelay > retryAfterCap {
-					raDelay = retryAfterCap
-				}
+				raDelay := min(time.Duration(secs)*time.Second, retryAfterCap)
 				delay = raDelay
 			}
 		}
@@ -484,8 +518,13 @@ func (w *WebhookWorker) classifyAndUpdate(
 			"attempts":        newAttempts,
 			"next_attempt_at": nextAt,
 			"last_error":      errMsg,
+			"lease_token":     nil, // clear lease so next claimer can acquire
 		}
-		if err := w.calls.UpdateStatus(ctx, call.ID, updates); err != nil {
+		if err := w.calls.UpdateStatusCAS(ctx, call.ID, lease, updates); err != nil {
+			if errors.Is(err, store.ErrLeaseExpired) {
+				slog.Warn("webhook.worker.lease_expired_on_retry", "call_id", call.ID)
+				return
+			}
 			slog.Error("webhook.worker.update_retry_failed",
 				"call_id", call.ID,
 				"error", err,
@@ -501,8 +540,13 @@ func (w *WebhookWorker) classifyAndUpdate(
 			"attempts":     newAttempts,
 			"last_error":   errMsg,
 			"completed_at": completedAt,
+			"lease_token":  nil,
 		}
-		if err := w.calls.UpdateStatus(ctx, call.ID, updates); err != nil {
+		if err := w.calls.UpdateStatusCAS(ctx, call.ID, lease, updates); err != nil {
+			if errors.Is(err, store.ErrLeaseExpired) {
+				slog.Warn("webhook.worker.lease_expired_on_fail", "call_id", call.ID)
+				return
+			}
 			slog.Error("webhook.worker.update_failed_failed",
 				"call_id", call.ID,
 				"error", err,
@@ -512,16 +556,18 @@ func (w *WebhookWorker) classifyAndUpdate(
 	default:
 		// 5xx or unexpected — retry with exponential backoff; move to dead at cap.
 		errMsg := fmt.Sprintf("http %d", code)
-		w.handleSendError(ctx, call, tenantID, newAttempts, errMsg, nil)
+		w.handleSendError(ctx, call, tenantID, newAttempts, lease, errMsg, nil)
 	}
 }
 
 // handleSendError routes a network or 5xx error to retry or dead based on attempt count.
+// lease is the CAS guard; ignored (falls through to UpdateStatus) only when lease is empty.
 func (w *WebhookWorker) handleSendError(
 	ctx context.Context,
 	call *store.WebhookCallData,
 	_ uuid.UUID,
 	newAttempts int,
+	lease string,
 	errMsg string,
 	_ error,
 ) {
@@ -532,8 +578,13 @@ func (w *WebhookWorker) handleSendError(
 			"attempts":     newAttempts,
 			"last_error":   errMsg,
 			"completed_at": completedAt,
+			"lease_token":  nil,
 		}
-		if err := w.calls.UpdateStatus(ctx, call.ID, updates); err != nil {
+		if err := w.calls.UpdateStatusCAS(ctx, call.ID, lease, updates); err != nil {
+			if errors.Is(err, store.ErrLeaseExpired) {
+				slog.Warn("webhook.worker.lease_expired_on_dead", "call_id", call.ID)
+				return
+			}
 			slog.Error("webhook.worker.update_dead_failed",
 				"call_id", call.ID,
 				"error", err,
@@ -549,8 +600,13 @@ func (w *WebhookWorker) handleSendError(
 		"attempts":        newAttempts,
 		"next_attempt_at": nextAt,
 		"last_error":      errMsg,
+		"lease_token":     nil,
 	}
-	if err := w.calls.UpdateStatus(ctx, call.ID, updates); err != nil {
+	if err := w.calls.UpdateStatusCAS(ctx, call.ID, lease, updates); err != nil {
+		if errors.Is(err, store.ErrLeaseExpired) {
+			slog.Warn("webhook.worker.lease_expired_on_retry", "call_id", call.ID)
+			return
+		}
 		slog.Error("webhook.worker.update_retry_failed",
 			"call_id", call.ID,
 			"error", err,
@@ -559,7 +615,8 @@ func (w *WebhookWorker) handleSendError(
 }
 
 // updateFailed marks the call as permanently failed (no retry).
-func (w *WebhookWorker) updateFailed(ctx context.Context, call *store.WebhookCallData, _ uuid.UUID, reason string) {
+// lease is the CAS guard for UpdateStatusCAS (K5).
+func (w *WebhookWorker) updateFailed(ctx context.Context, call *store.WebhookCallData, _ uuid.UUID, lease, reason string) {
 	newAttempts := call.Attempts + 1
 	completedAt := time.Now()
 	updates := map[string]any{
@@ -567,8 +624,13 @@ func (w *WebhookWorker) updateFailed(ctx context.Context, call *store.WebhookCal
 		"attempts":     newAttempts,
 		"last_error":   reason,
 		"completed_at": completedAt,
+		"lease_token":  nil,
 	}
-	if err := w.calls.UpdateStatus(ctx, call.ID, updates); err != nil {
+	if err := w.calls.UpdateStatusCAS(ctx, call.ID, lease, updates); err != nil {
+		if errors.Is(err, store.ErrLeaseExpired) {
+			slog.Warn("webhook.worker.lease_expired_on_fail", "call_id", call.ID)
+			return
+		}
 		slog.Error("webhook.worker.update_failed_error",
 			"call_id", call.ID,
 			"error", err,
@@ -577,10 +639,11 @@ func (w *WebhookWorker) updateFailed(ctx context.Context, call *store.WebhookCal
 }
 
 // updateRetry resets the call to queued with backoff for transient failures.
-func (w *WebhookWorker) updateRetry(ctx context.Context, call *store.WebhookCallData, _ uuid.UUID, reason string) {
+// lease is the CAS guard for UpdateStatusCAS (K5).
+func (w *WebhookWorker) updateRetry(ctx context.Context, call *store.WebhookCallData, _ uuid.UUID, lease, reason string) {
 	newAttempts := call.Attempts + 1
 	if newAttempts >= MaxAttempts {
-		w.updateFailed(ctx, call, uuid.Nil, reason)
+		w.updateFailed(ctx, call, uuid.Nil, lease, reason)
 		return
 	}
 	delay := DelayFor(newAttempts)
@@ -590,8 +653,13 @@ func (w *WebhookWorker) updateRetry(ctx context.Context, call *store.WebhookCall
 		"attempts":        newAttempts,
 		"next_attempt_at": nextAt,
 		"last_error":      reason,
+		"lease_token":     nil,
 	}
-	if err := w.calls.UpdateStatus(ctx, call.ID, updates); err != nil {
+	if err := w.calls.UpdateStatusCAS(ctx, call.ID, lease, updates); err != nil {
+		if errors.Is(err, store.ErrLeaseExpired) {
+			slog.Warn("webhook.worker.lease_expired_on_retry", "call_id", call.ID)
+			return
+		}
 		slog.Error("webhook.worker.update_retry_error",
 			"call_id", call.ID,
 			"error", err,
@@ -600,15 +668,25 @@ func (w *WebhookWorker) updateRetry(ctx context.Context, call *store.WebhookCall
 }
 
 // resetToQueued returns a row claimed by ClaimNext back to queued without incrementing
-// attempts. Used when the per-tenant limiter rejects the claim.
+// attempts. Used when the per-tenant limiter rejects the claim before any delivery work.
+// Uses UpdateStatusCAS with the lease from ClaimNext (K5) to prevent races.
 func (w *WebhookWorker) resetToQueued(ctx context.Context, call *store.WebhookCallData, tenantID uuid.UUID, reason string) {
+	lease := ""
+	if call.LeaseToken != nil {
+		lease = *call.LeaseToken
+	}
 	tctx := store.WithTenantID(ctx, tenantID)
 	updates := map[string]any{
-		"status":     "queued",
-		"started_at": nil,
+		"status":      "queued",
+		"started_at":  nil,
+		"lease_token": nil, // clear lease so next claimer can acquire
 		// attempts left unchanged — this was not a real send attempt
 	}
-	if err := w.calls.UpdateStatus(tctx, call.ID, updates); err != nil {
+	if err := w.calls.UpdateStatusCAS(tctx, call.ID, lease, updates); err != nil {
+		if errors.Is(err, store.ErrLeaseExpired) {
+			slog.Warn("webhook.worker.lease_expired_on_reset", "call_id", call.ID)
+			return
+		}
 		slog.Error("webhook.worker.reset_queued_failed",
 			"call_id", call.ID,
 			"reason", reason,
@@ -750,8 +828,8 @@ func hostOnly(rawURL string) string {
 	for _, pfx := range []string{"https://", "http://"} {
 		if strings.HasPrefix(rawURL, pfx) {
 			rest := rawURL[len(pfx):]
-			if i := strings.IndexByte(rest, '/'); i >= 0 {
-				return rest[:i]
+			if before, _, ok := strings.Cut(rest, "/"); ok {
+				return before
 			}
 			return rest
 		}

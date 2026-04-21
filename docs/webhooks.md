@@ -16,6 +16,8 @@
 10. [Edition Differences](#10-edition-differences)
 11. [Security](#11-security)
 12. [HMAC Receiver Examples](#12-hmac-receiver-examples)
+13. [Audit Payload Shape](#13-audit-payload-shape-webhook_callsrequest_payload)
+14. [Encryption at Rest](#14-encryption-at-rest)
 
 ---
 
@@ -63,7 +65,7 @@ Fields:
 | `localhost_only` | bool | no | Restrict callers to 127.0.0.1/::1. Auto-set on Lite edition |
 | `rate_limit_per_min` | int | no | Per-webhook cap; 0 = use tenant default |
 | `scopes` | []string | no | Reserved for future scope enforcement |
-| `ip_allowlist` | []string | no | Reserved; not yet enforced at middleware |
+| `ip_allowlist` | []string | no | Allowlist of IPs or CIDR ranges. Empty = allow all. See [IP Allowlist](#ip-allowlist) |
 
 **Response — 201 Created**
 
@@ -173,6 +175,24 @@ header      = "t={unix_ts},v1={hex(signature)}"
 
 **Key contract:** `hmac_signing_key` = `hex(SHA-256(raw_secret))`. The signing key is the **decoded bytes** of this hex string. The raw secret is never stored — only its hash.
 
+### HMAC Replay Protection
+
+After a valid HMAC signature is accepted, the gateway records `sha256(tenant_id + "|" + signature_hex)` in an in-memory nonce cache with a 320-second TTL (> 2× skew window). Any request replaying the same signature within the window is rejected with HTTP 401 and logged as `security.webhook.hmac_replay`.
+
+**Single-node caveat:** The nonce cache is per-process and not distributed. In a multi-node deployment a replay could succeed on a different node. This is an accepted trade-off for the current single-process gateway architecture.
+
+### IP Allowlist
+
+When `ip_allowlist` is non-empty, the gateway checks the request's source IP (from `RemoteAddr`) against every entry after successful auth. Each entry can be:
+- A single IP address: `"1.2.3.4"`, `"::1"`
+- A CIDR range: `"10.0.0.0/8"`, `"2001:db8::/32"`
+
+An empty `ip_allowlist` (the default) allows requests from any source — back-compat with existing webhooks.
+
+Rejected requests return HTTP 403 and are logged as `security.webhook.ip_denied`.
+
+**Proxy note:** `X-Forwarded-For` is **not** trusted — only `RemoteAddr` is used. If your gateway sits behind a reverse proxy, ensure the proxy is configured to terminate TLS and handle allowlist enforcement itself, or accept that `RemoteAddr` will be the proxy IP.
+
 ---
 
 ## 4. POST /v1/webhooks/llm
@@ -252,8 +272,8 @@ The agent runs asynchronously. Results are delivered via outbound callback (see 
 | Status | Code | When |
 |--------|------|------|
 | 400 | `invalid_request` | Missing `input`, bad `mode`, missing `callback_url` for async |
-| 401 | — | Auth failure (bearer invalid, HMAC mismatch, revoked) |
-| 403 | `unauthorized` | `localhost_only` violation, kind mismatch, tenant mismatch |
+| 401 | — | Auth failure (bearer invalid, HMAC mismatch, revoked, HMAC replay) |
+| 403 | `unauthorized` | `localhost_only` violation, IP allowlist denial, kind mismatch, tenant mismatch |
 | 404 | `not_found` | Agent not found |
 | 429 | — | Rate limit exceeded; `Retry-After: 60` header set |
 | 503 | — | Webhook processing lane at capacity |
@@ -617,3 +637,99 @@ requests.post(
     data=body,
 )
 ```
+
+---
+
+## 13. Audit Payload Shape (`webhook_calls.request_payload`)
+
+Every call creates a row in `webhook_calls` with a `request_payload` column (`jsonb` on PostgreSQL, `TEXT` on SQLite). The canonical shape is:
+
+```json
+{
+  "body_hash": "<sha256-hex-64-chars>",
+  "meta": { ... handler-specific fields ... }
+}
+```
+
+### `body_hash`
+
+SHA-256 hex digest of the raw request body bytes. Used by the idempotency subsystem to detect body-mismatch replays (same `Idempotency-Key`, different body → 409 Conflict).
+
+### `meta` by handler
+
+**`POST /v1/webhooks/llm`** — meta mirrors the decoded request fields:
+
+```json
+{
+  "input": "<raw JSON — string or message array>",
+  "session_key": "optional-key",
+  "user_id": "optional-uid",
+  "model": "optional-override",
+  "mode": "sync",
+  "callback_url": "",
+  "metadata": null
+}
+```
+
+**`POST /v1/webhooks/message`** — meta contains delivery context:
+
+```json
+{
+  "channel_name": "telegram-main",
+  "chat_id": "123456789",
+  "has_media": false
+}
+```
+
+### Notes
+
+- `body_hash` is always exactly 64 lowercase hex characters. Any stored value that does not match this format is treated as "no hash" by the idempotency checker (fail-closed).
+- External consumers reading `request_payload` via SQL should parse it as JSON, not as raw bytes.
+- Shape is stable across LLM and message handler calls — only `meta` contents differ.
+
+---
+
+## 14. Encryption at Rest
+
+### Raw Secret Encryption
+
+The webhook secret is encrypted at rest using AES-256-GCM, keyed by the environment variable `GOCLAW_ENCRYPTION_KEY` (required for webhook HMAC auth to work). Only the database stores encrypted secret material.
+
+**Key contract (POST /v1/webhooks create/rotate response):**
+
+```json
+{
+  "secret": "wh_ABCDEFGHIJKLMNOPQRSTUVWXYZ234567ABCDEFGH",
+  "hmac_signing_key": "a3f4...hex64chars"
+}
+```
+
+- `secret` — Raw bearer token in plaintext. Clients **must store securely** on their end; the gateway will not retrieve it again.
+- `hmac_signing_key` — Derived as `hex(SHA-256(secret))`. This is also returned once and should be stored securely by clients.
+
+**Database storage:**
+
+- `webhooks.secret_hash` column: `SHA-256(secret)` in hex. Used for bearer auth lookups (constant-time comparison).
+- `webhooks.encrypted_secret` column (PG/SQLite): AES-256-GCM encrypted raw secret. Used to support lease-token reclamation and idempotency recovery on stale calls.
+- Environment variable `GOCLAW_ENCRYPTION_KEY` — required for webhook processing. Same key also encrypts LLM provider API keys. Format: base64-encoded 32-byte key.
+
+**Migration notes:**
+
+- PostgreSQL: Migration `000058` added `encrypted_secret` column.
+- SQLite (Lite edition): Schema v28 includes encrypted secret support.
+
+**DB compromise impact:**
+
+A database-layer attacker with read-only access to `webhooks` table **cannot** derive the raw secret or `hmac_signing_key`:
+- `secret_hash` alone does not reverse-engineer the secret (cryptographic hash).
+- `encrypted_secret` requires `GOCLAW_ENCRYPTION_KEY` to decrypt (environment-only, not in database).
+- Attackers gain no actionable HMAC material.
+
+### Environment Variable Security
+
+`GOCLAW_ENCRYPTION_KEY` must be:
+- Stored securely (e.g., sealed in a secret manager, not in `config.json`).
+- Same across all gateway instances in a cluster (standard multi-replica key).
+- Rotated as part of incident response — rotation requires re-encrypting all webhook secrets (automated migration).
+
+---

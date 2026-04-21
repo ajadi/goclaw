@@ -28,7 +28,7 @@ func NewPGWebhookCallStore(db *sql.DB) *PGWebhookCallStore {
 // webhookCallColumns is the canonical SELECT column list for webhook_calls.
 const webhookCallColumns = `id, tenant_id, webhook_id, agent_id, delivery_id,
 	idempotency_key, mode, status, callback_url, attempts,
-	next_attempt_at, started_at, request_payload, response, last_error,
+	next_attempt_at, started_at, lease_token, request_payload, response, last_error,
 	created_at, completed_at`
 
 // scanWebhookCallRow scans a single webhook_calls row into WebhookCallData.
@@ -41,7 +41,7 @@ func scanWebhookCallRow(row interface {
 	err := row.Scan(
 		&c.ID, &c.TenantID, &c.WebhookID, &agentID, &c.DeliveryID,
 		&c.IdempotencyKey, &c.Mode, &c.Status, &c.CallbackURL, &c.Attempts,
-		&c.NextAttemptAt, &c.StartedAt, &c.RequestPayload, &c.Response, &c.LastError,
+		&c.NextAttemptAt, &c.StartedAt, &c.LeaseToken, &c.RequestPayload, &c.Response, &c.LastError,
 		&c.CreatedAt, &c.CompletedAt,
 	)
 	if err != nil {
@@ -112,6 +112,16 @@ func (s *PGWebhookCallStore) UpdateStatus(ctx context.Context, id uuid.UUID, upd
 	return execMapUpdateWhereTenantNoUpdatedAt(ctx, s.db, "webhook_calls", updates, id, tid)
 }
 
+// UpdateStatusCAS applies updates with an optimistic-concurrency guard on lease_token.
+// Returns store.ErrLeaseExpired if 0 rows were affected (lease mismatch → row reclaimed).
+func (s *PGWebhookCallStore) UpdateStatusCAS(ctx context.Context, id uuid.UUID, lease string, updates map[string]any) error {
+	tid, err := requireTenantID(ctx)
+	if err != nil {
+		return err
+	}
+	return execMapUpdateWhereTenantLease(ctx, s.db, "webhook_calls", updates, id, tid, lease)
+}
+
 // ClaimNext atomically claims the next queued call due for delivery.
 // Uses SELECT ... FOR UPDATE SKIP LOCKED to prevent double-claiming under concurrency.
 // Sets status='running' and started_at=now. Does NOT touch attempts.
@@ -142,13 +152,15 @@ func (s *PGWebhookCallStore) ClaimNext(ctx context.Context, tenantID uuid.UUID, 
 		return nil, err // includes sql.ErrNoRows when queue is empty
 	}
 
-	// Mark running and record started_at. Attempts untouched — worker increments post-send.
+	// Mark running, record started_at, and set a fresh lease_token for CAS guards.
+	// Attempts untouched — worker increments post-send.
+	lease := uuid.New().String()
 	row := tx.QueryRowContext(ctx,
 		`UPDATE webhook_calls
-		 SET status = 'running', started_at = $1
-		 WHERE id = $2
+		 SET status = 'running', started_at = $1, lease_token = $2
+		 WHERE id = $3
 		 RETURNING `+webhookCallColumns,
-		now, callID,
+		now, lease, callID,
 	)
 	call, err := scanWebhookCallRow(row)
 	if err != nil {
@@ -235,9 +247,10 @@ func (s *PGWebhookCallStore) DeleteOlderThan(ctx context.Context, tenantID uuid.
 // claimed it crashed before completing UpdateStatus).
 // Cross-tenant: no tenant_id filter — the retention worker sweeps the whole table.
 func (s *PGWebhookCallStore) ReclaimStale(ctx context.Context, staleThreshold time.Time) (int64, error) {
+	// Clear lease_token so any in-flight UpdateStatusCAS from the crashed worker returns ErrLeaseExpired.
 	res, err := s.db.ExecContext(ctx,
 		`UPDATE webhook_calls
-		 SET status = 'queued', started_at = NULL
+		 SET status = 'queued', started_at = NULL, lease_token = NULL
 		 WHERE status = 'running' AND started_at < $1`,
 		staleThreshold,
 	)
@@ -245,6 +258,38 @@ func (s *PGWebhookCallStore) ReclaimStale(ctx context.Context, staleThreshold ti
 		return 0, err
 	}
 	return res.RowsAffected()
+}
+
+// execMapUpdateWhereTenantLease is like execMapUpdateWhereTenantNoUpdatedAt but adds
+// AND lease_token = $N to the WHERE clause for optimistic concurrency.
+// Returns store.ErrLeaseExpired when RowsAffected() == 0 (lease mismatch).
+func execMapUpdateWhereTenantLease(ctx context.Context, db *sql.DB, table string, updates map[string]any, id, tenantID uuid.UUID, lease string) error {
+	if len(updates) == 0 {
+		return nil
+	}
+	var setClauses []string
+	var args []any
+	n := 1
+	for col, val := range updates {
+		if !validColumnName.MatchString(col) {
+			return fmt.Errorf("invalid column name: %q", col)
+		}
+		setClauses = append(setClauses, fmt.Sprintf("%s = $%d", col, n))
+		args = append(args, val)
+		n++
+	}
+	args = append(args, id, tenantID, lease)
+	q := fmt.Sprintf("UPDATE %s SET %s WHERE id = $%d AND tenant_id = $%d AND lease_token = $%d",
+		table, strings.Join(setClauses, ", "), n, n+1, n+2)
+	res, err := db.ExecContext(ctx, q, args...)
+	if err != nil {
+		return err
+	}
+	affected, _ := res.RowsAffected()
+	if affected == 0 {
+		return store.ErrLeaseExpired
+	}
+	return nil
 }
 
 // execMapUpdateWhereTenantNoUpdatedAt is like execMapUpdateWhereTenant but does NOT
