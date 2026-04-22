@@ -14,6 +14,7 @@ import (
 	"github.com/nextlevelbuilder/goclaw/internal/bus"
 	"github.com/nextlevelbuilder/goclaw/internal/channels"
 	"github.com/nextlevelbuilder/goclaw/internal/channels/typing"
+	"github.com/nextlevelbuilder/goclaw/internal/store"
 	"github.com/nextlevelbuilder/goclaw/internal/tools"
 )
 
@@ -23,6 +24,13 @@ func (c *Channel) handleMessage(ctx context.Context, update telego.Update) {
 	if message == nil {
 		return
 	}
+
+	// Propagate the channel instance's tenant_id into ctx so all downstream
+	// DB writes (pairing requests, sessions, pending history, etc.) are
+	// scoped to the correct tenant. Without this, tenantIDForInsert() falls
+	// back to MasterTenantID and /nodes (scoped to the admin's tenant) can't
+	// see pending pairings created by Telegram. Matches Discord/Slack/Zalo.
+	ctx = store.WithTenantID(ctx, c.TenantID())
 
 	// Proactive migration detection: group upgraded to supergroup.
 	// Must run BEFORE isServiceMessage() — migration messages have no text/media.
