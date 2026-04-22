@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useUiStore } from "@/stores/use-ui-store";
 import { useAuthStore } from "@/stores/use-auth-store";
 import { useTenants } from "@/hooks/use-tenants";
-import { useIsMobile } from "@/hooks/use-media-query";
+import { useIsTablet } from "@/hooks/use-media-query";
 import { useEmbeddingStatus } from "@/hooks/use-embedding-status";
 
 import { ROUTES, SUPPORTED_LANGUAGES, LANGUAGE_LABELS, TIMEZONE_OPTIONS, LOCAL_STORAGE_KEYS, type Language } from "@/lib/constants";
@@ -31,7 +31,10 @@ export function Topbar({ settingsOpen, onSettingsOpenChange }: TopbarProps) {
   const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
   const setMobileSidebarOpen = useUiStore((s) => s.setMobileSidebarOpen);
-  const isMobile = useIsMobile();
+  // why: must match AppLayout's breakpoint (useIsTablet, <=1024px) — otherwise
+  // at iPad portrait / small-laptop widths the drawer layout is mounted but
+  // the hamburger still calls desktop toggleSidebar() and the drawer never opens.
+  const isMobile = useIsTablet();
   const isDark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
   const { status: embStatus } = useEmbeddingStatus();
   const setSettingsOpen = onSettingsOpenChange;
