@@ -1,0 +1,45 @@
+{
+  "title": "Сессии",
+  "description": "Просмотр сессий переписки",
+  "searchPlaceholder": "Поиск сессий...",
+  "emptyTitle": "Сессий пока нет",
+  "emptyDescription": "Сессии появятся здесь, когда вы начнёте общаться.",
+  "noMatchTitle": "Нет подходящих сессий",
+  "noMatchDescription": "Попробуйте другой поисковый запрос.",
+  "columns": {
+    "session": "Сессия",
+    "agent": "Агент",
+    "context": "Контекст",
+    "messages": "Сообщения",
+    "updated": "Обновлено"
+  },
+  "contextBar": {
+    "compacted": "Сжато раз: {{count}}"
+  },
+  "detail": {
+    "reset": "Сбросить",
+    "delete": "Удалить",
+    "deleteTitle": "Удалить сессию",
+    "deleteDescription": "Это навсегда удалит все сообщения в этой сессии.",
+    "resetTitle": "Сбросить сессию",
+    "resetDescription": "Это очистит все сообщения, но оставит саму сессию.",
+    "confirmDelete": "Удалить",
+    "confirmReset": "Сбросить",
+    "noMessages": "В этой сессии нет сообщений",
+    "summary": "Саммари",
+    "showMore": "Показать больше",
+    "showLess": "Показать меньше",
+    "showDetails": "показать детали",
+    "hide": "скрыть",
+    "systemMessage": "Системное сообщение",
+    "messages": "сообщений"
+  },
+  "toast": {
+    "deleted": "Сессия удалена",
+    "deleteFailed": "Не удалось удалить сессию",
+    "reset": "Сессия сброшена",
+    "resetFailed": "Не удалось сбросить сессию",
+    "updated": "Сессия обновлена",
+    "updateFailed": "Не удалось обновить сессию"
+  }
+}

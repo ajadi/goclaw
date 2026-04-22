@@ -1,0 +1,15 @@
+{
+  "title": "Логи",
+  "description": "Live log tailing",
+  "descriptionLive": "Live tailing at {{level}} level",
+  "live": "Live",
+  "start": "Запустить",
+  "stop": "Остановить",
+  "clear": "Очистить",
+  "filterPlaceholder": "Filter logs...",
+  "logLevelTitle": "Уровень лога",
+  "emptyWaiting": "Waiting for logs...",
+  "emptyFilter": "No logs match filter.",
+  "emptyStart": "Click \"Start\" to begin streaming logs.",
+  "count": "{{filtered}}/{{total}}"
+}

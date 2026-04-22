@@ -1,0 +1,35 @@
+{
+  "title": "Узлы",
+  "description": "Manage paired devices and pending pairing requests",
+  "emptyTitle": "No devices",
+  "emptyDescription": "No paired devices or pending pairing requests.",
+  "pendingRequests": "Pending Requests ({{count}})",
+  "pairedDevices": "Paired Devices ({{count}})",
+  "sender": "Sender:",
+  "chat": "Chat:",
+  "columns": {
+    "channel": "Канал",
+    "senderId": "Sender ID",
+    "paired": "Paired",
+    "by": "By",
+    "actions": "Действия"
+  },
+  "approve": "Принять",
+  "deny": "Запретить",
+  "revoke": "Отозвать",
+  "confirmApprove": {
+    "title": "Approve Pairing",
+    "description": "Approve pairing request from {{channel}}:{{senderId}} (code: {{code}})? This device will be able to interact with agents.",
+    "confirmLabel": "Принять"
+  },
+  "confirmDeny": {
+    "title": "Deny Pairing",
+    "description": "Deny pairing request from {{channel}}:{{senderId}} (code: {{code}})? The request will be removed.",
+    "confirmLabel": "Запретить"
+  },
+  "confirmRevoke": {
+    "title": "Revoke Device",
+    "description": "Revoke pairing for {{channel}}:{{senderId}}? The device will need to re-pair.",
+    "confirmLabel": "Отозвать"
+  }
+}

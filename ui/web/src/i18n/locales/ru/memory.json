@@ -1,0 +1,235 @@
+{
+  "title": "Память",
+  "description": "Browse and manage agent memory documents, chunks, and embeddings",
+  "search": "Поиск",
+  "create": "Создать",
+  "indexAll": "Index All",
+  "indexing": "Indexing...",
+  "emptyTitle": "No memory documents",
+  "emptyAgentDescription": "This agent has no memory documents yet.",
+  "emptyGlobalDescription": "No memory documents found across any agent.",
+  "filters": {
+    "agent": "Агент",
+    "allAgents": "All agents",
+    "scope": "Область",
+    "allScope": "All (global + personal)",
+    "selectAgent": "Select an agent"
+  },
+  "tabs": {
+    "documents": "Документы",
+    "episodic": "Episodic Memory"
+  },
+  "columns": {
+    "path": "Путь",
+    "agent": "Агент",
+    "scope": "Область",
+    "hash": "Hash",
+    "updated": "Обновлено",
+    "actions": "Действия"
+  },
+  "scopeLabel": {
+    "personal": "Personal",
+    "global": "Global"
+  },
+  "delete": {
+    "title": "Delete Memory Document",
+    "description": "Are you sure you want to delete \"{{path}}\"? This will also delete all associated chunks and embeddings.",
+    "confirmLabel": "Удалить"
+  },
+  "createDialog": {
+    "title": "Create Memory Document",
+    "path": "Path *",
+    "pathPlaceholder": "e.g. notes/project-overview.md",
+    "content": "Content *",
+    "contentPlaceholder": "Document content...",
+    "agentId": "Agent *",
+    "agentIdPlaceholder": "Select agent...",
+    "scope": "Область",
+    "existingScope": "Existing scope",
+    "customScope": "Пользовательские",
+    "selectGroupUser": "Select group/user...",
+    "scopeHint": "Global = shared across all users. Personal = scoped to a specific user or group chat.",
+    "autoIndex": "Auto-index after creation",
+    "agentRequired": "Please select an agent",
+    "pathRequired": "Path is required",
+    "contentRequired": "Content is required",
+    "cancel": "Отмена",
+    "create": "Создать",
+    "creating": "Создание..."
+  },
+  "documentDialog": {
+    "title": "Memory Document",
+    "path": "Path:",
+    "agent": "Agent:",
+    "scope": "Scope:",
+    "hash": "Hash:",
+    "updated": "Updated:",
+    "content": "Содержимое",
+    "chunks": "Chunks ({{count}})",
+    "chunkIndex": "Chunk {{index}}",
+    "noChunks": "No chunks",
+    "embedded": "Embedded",
+    "noEmbedding": "No embedding"
+  },
+  "searchDialog": {
+    "title": "Search Memory",
+    "query": "Search Query",
+    "queryPlaceholder": "Enter search query...",
+    "agentId": "Agent ID",
+    "agentIdPlaceholder": "Filter by agent...",
+    "limit": "Лимит",
+    "search": "Поиск",
+    "searching": "Searching...",
+    "results": "Results",
+    "noResults": "No results found",
+    "similarity": "similarity",
+    "path": "Path:"
+  },
+  "kg": {
+    "pageTitle": "Граф знаний",
+    "pageDescription": "Explore entities and relationships extracted from agent memory.",
+    "selectAgentTitle": "Select an agent",
+    "selectAgentDescription": "Choose an agent to view its knowledge graph.",
+    "emptyTitle": "No entities",
+    "emptyDescription": "No knowledge graph entities for this agent yet.",
+    "emptySearchDescription": "No entities match your search.",
+    "stats": {
+      "entities": "Entities: {{count}}",
+      "relations": "Relations: {{count}}"
+    },
+    "search": {
+      "placeholder": "Search entities...",
+      "button": "Поиск",
+      "clear": "Очистить"
+    },
+    "refresh": "Обновить",
+    "extract": "Extract",
+    "columns": {
+      "name": "Имя",
+      "type": "Тип",
+      "description": "Описание",
+      "confidence": "Confidence",
+      "actions": "Действия",
+      "observations": "Observations",
+      "relations": "Relations"
+    },
+    "dedup": {
+      "button": "Dedup",
+      "title": "Duplicate Entities",
+      "description": "Review and merge entities that may be duplicates based on embedding similarity.",
+      "noCandidates": "No duplicate candidates found.",
+      "similar": "similar",
+      "merge": "Merge",
+      "dismiss": "Закрыть",
+      "merged": "Entities merged successfully.",
+      "mergeFailed": "Failed to merge entities.",
+      "dismissed": "Candidate dismissed.",
+      "dismissFailed": "Failed to dismiss candidate.",
+      "scan": "Scan All",
+      "scanning": "Scanning...",
+      "scanComplete": "Scan complete.",
+      "scanFailed": "Scan failed.",
+      "count": "{{count}} candidate(s)"
+    },
+    "deleteEntity": {
+      "title": "Delete Entity",
+      "description": "Delete \"{{name}}\"? This will also delete all associated relations.",
+      "confirmLabel": "Удалить"
+    },
+    "entity": {
+      "externalId": "External ID:",
+      "confidence": "Confidence:",
+      "description": "Description:",
+      "source": "Source:",
+      "properties": "Properties:",
+      "relations": "Relations",
+      "traverse": "Traverse",
+      "depthOption": "{{depth}}-hop",
+      "tabs": {
+        "table": "Таблица",
+        "graph": "Graph"
+      },
+      "traversing": "Traversing...",
+      "loading": "Загрузка...",
+      "noRelations": "No relations found.",
+      "showAll": "Show all",
+      "traversalResults": "Traversal Results ({{count}})",
+      "direction": {
+        "outgoing": "→ outgoing",
+        "incoming": "← incoming"
+      },
+      "columns": {
+        "direction": "Direction",
+        "relation": "Relation",
+        "target": "Цель",
+        "confidence": "Confidence"
+      }
+    },
+    "extractDialog": {
+      "title": "Extract Entities from Text",
+      "providerLabel": "Extraction Provider",
+      "modelLabel": "Extraction Model",
+      "textLabel": "Text to extract from",
+      "textPlaceholder": "Paste conversation text, notes, or any content to extract entities and relations from...",
+      "extract": "Extract",
+      "extracting": "Extracting...",
+      "cancel": "Отмена",
+      "agentId": "Agent ID",
+      "agentIdPlaceholder": "Leave blank for global"
+    },
+    "graphView": {
+      "loading": "Loading graph...",
+      "empty": "No entities to visualize",
+      "nodes": "{{count}} nodes",
+      "edges": "{{count}} edges",
+      "selected": "Selected: {{name}}",
+      "limitNote": "Showing top {{limit}} of {{total}} entities",
+      "limitHint": "Graph is limited to {{limit}} entities for performance. Use the table view to browse all {{total}} entities."
+    }
+  },
+  "toast": {
+    "created": "Memory document создан",
+    "deleted": "Memory document удалён",
+    "indexed": "All documents indexed",
+    "failedCreate": "Не удалось создать document",
+    "failedDelete": "Не удалось удалить document",
+    "failedIndex": "Failed to index documents",
+    "entitySaved": "Entity сохранён",
+    "entitySaveFailed": "Не удалось сохранить entity",
+    "entityDeleted": "Entity удалён",
+    "entityDeleteFailed": "Не удалось удалить entity",
+    "extractionComplete": "Extraction complete",
+    "extractionFailed": "Extraction failed",
+    "traversalFailed": "Traversal failed",
+    "unknownError": "Unknown error",
+    "docCreated": "Document создан",
+    "docCreateFailed": "Не удалось создать document",
+    "docUpdated": "Document обновлён",
+    "docUpdateFailed": "Не удалось обновить document",
+    "docDeleted": "Document удалён",
+    "docDeleteFailed": "Не удалось удалить document",
+    "docIndexed": "Document indexed",
+    "docIndexFailed": "Failed to index document",
+    "allIndexed": "All documents indexed",
+    "allIndexFailed": "Failed to index all",
+    "searchFailed": "Search failed",
+    "docLoadFailed": "Не удалось загрузить document"
+  },
+  "episodic": {
+    "noData": "No episodic memories yet",
+    "noDataHint": "Summaries are generated automatically from agent sessions",
+    "selectAgent": "Select an agent to view episodic memories",
+    "searchPlaceholder": "Search episodic memory...",
+    "clearSearch": "Очистить",
+    "results": "results",
+    "turns": "turns",
+    "tokens": "tokens",
+    "expand": "Show full summary",
+    "collapse": "Hide summary",
+    "source": {
+      "session": "Сессия",
+      "v2_daily": "Ежедневно",
+      "manual": "Manual"
+    }
+  }
+}

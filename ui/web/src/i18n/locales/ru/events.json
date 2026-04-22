@@ -1,0 +1,40 @@
+{
+  "title": "События в реальном времени",
+  "description": "Live WebSocket events across all teams and agents",
+  "live": "Live",
+  "paused": "Приостановлено",
+  "resume": "Возобновить",
+  "pause": "Пауза",
+  "clear": "Очистить",
+  "scrollToBottom": "Scroll to bottom",
+  "eventCount": "{{count}} event",
+  "eventCountPlural": "{{count}} events",
+  "categories": {
+    "all": "Все",
+    "task": "Task",
+    "message": "Сообщение",
+    "agent": "Агент",
+    "teamCrud": "Team CRUD",
+    "agentLink": "Agent Link"
+  },
+  "filters": {
+    "allTeams": "All teams",
+    "allUsers": "All users",
+    "allChats": "All chats"
+  },
+  "global": "Global",
+  "emptyTitle": "No events yet",
+  "emptyPaused": "Event capture is paused. Resume to see new events.",
+  "emptyWaiting": "Waiting for real-time events... Events will appear as agents work.",
+  "detail": {
+    "copy": "Копировать",
+    "copied": "Скопировано"
+  },
+  "toolBadge": {
+    "error": "ошибка",
+    "activated": "activated",
+    "ok": "ok"
+  },
+  "moreArgs": "...{{count}} more",
+  "parentLabel": "parent:"
+}
