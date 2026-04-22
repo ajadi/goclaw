@@ -1,0 +1,4 @@
+services:
+  chrome:
+    image: chromedp/headless-shell:latest
+    ports: ["127.0.0.1:9222:9222"]
