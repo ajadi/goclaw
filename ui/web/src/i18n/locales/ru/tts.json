@@ -1,265 +1,265 @@
 {
   "title": "Text-to-Speech",
-  "description": "Configure TTS providers and auto-apply settings",
+  "description": "Настройка TTS-провайдеров и параметров автоприменения",
   "save": "Сохранить",
   "saving": "Сохранение...",
-  "saveChanges": "Save Changes",
+  "saveChanges": "Сохранить изменения",
   "status": {
     "title": "Статус",
-    "configured": "Configured",
+    "configured": "Настроено",
     "disabled": "Отключено",
-    "noProvider": "No TTS provider configured",
-    "activeProvider": "Primary provider: {{provider}}, Auto: {{auto}}"
+    "noProvider": "TTS-провайдер не настроен",
+    "activeProvider": "Основной провайдер: {{provider}}, Авто: {{auto}}"
   },
   "general": {
-    "title": "General Settings",
-    "primaryProvider": "Primary Provider",
-    "autoApplyMode": "Auto-Apply Mode",
-    "replyMode": "Reply Mode",
-    "maxTextLength": "Max Text Length",
-    "timeout": "Timeout (ms)"
+    "title": "Общие настройки",
+    "primaryProvider": "Основной провайдер",
+    "autoApplyMode": "Режим автоприменения",
+    "replyMode": "Режим ответа",
+    "maxTextLength": "Макс. длина текста",
+    "timeout": "Таймаут (мс)"
   },
   "providers": {
-    "none": "None (Disabled)",
+    "none": "Нет (отключено)",
     "openai": "OpenAI",
     "elevenlabs": "ElevenLabs",
-    "edge": "Edge (Free)",
+    "edge": "Edge (бесплатно)",
     "minimax": "MiniMax",
     "gemini": "Google Gemini"
   },
   "autoModes": {
     "off": "Выкл",
-    "offDesc": "Agent can use TTS tool manually",
-    "always": "Always",
-    "alwaysDesc": "All replies get audio",
-    "inbound": "Inbound",
-    "inboundDesc": "Only when user sends voice/audio",
-    "tagged": "Tagged",
-    "taggedDesc": "Only when reply contains [[tts]] tag"
+    "offDesc": "Агент может использовать TTS-инструмент вручную",
+    "always": "Всегда",
+    "alwaysDesc": "Все ответы получают аудио",
+    "inbound": "Входящие",
+    "inboundDesc": "Только когда пользователь отправляет голос/аудио",
+    "tagged": "По тегу",
+    "taggedDesc": "Только когда ответ содержит тег [[tts]]"
   },
   "replyModes": {
-    "final": "Final only",
-    "finalDesc": "Only final replies",
+    "final": "Только финальные",
+    "finalDesc": "Только финальные ответы",
     "all": "Все",
-    "allDesc": "All replies including tool/block"
+    "allDesc": "Все ответы, включая инструмент/блок"
   },
-  "providerSettings": "{{provider}} Settings",
+  "providerSettings": "Настройки {{provider}}",
   "openai": {
     "apiKey": "API-ключ",
     "apiBase": "API Base URL",
     "model": "Модель",
-    "voice": "Voice",
+    "voice": "Голос",
     "speed": {
-      "label": "Speed",
-      "help": "Speech speed multiplier — 0.25 = slowest, 4.0 = fastest."
+      "label": "Скорость",
+      "help": "Множитель скорости речи — 0.25 = самая медленная, 4.0 = самая быстрая."
     },
     "responseFormat": {
-      "label": "Output Format",
-      "help": "Audio encoding returned by the API (mp3, opus, aac, flac, wav, pcm)."
+      "label": "Формат вывода",
+      "help": "Кодировка аудио, возвращаемого API (mp3, opus, aac, flac, wav, pcm)."
     },
     "instructions": {
-      "label": "Instructions",
-      "help": "System-level style prompt — only supported on gpt-4o-mini-tts model."
+      "label": "Инструкции",
+      "help": "Системный стилевой промпт — поддерживается только моделью gpt-4o-mini-tts."
     }
   },
   "elevenlabs": {
     "apiKey": "API-ключ",
-    "baseUrl": "Базовый URL",
+    "baseUrl": "Base URL",
     "voiceId": "Voice ID",
     "modelId": "Model ID",
     "voiceSettings": {
       "stability": {
-        "label": "Stability",
-        "help": "0 = more expressive variation, 1 = more consistent and stable."
+        "label": "Стабильность",
+        "help": "0 = более выразительная вариативность, 1 = более постоянный и стабильный."
       },
       "similarityBoost": {
-        "label": "Similarity Boost",
-        "help": "How closely output matches the original voice clone (0 = creative, 1 = similar)."
+        "label": "Усиление схожести",
+        "help": "Насколько точно вывод совпадает с оригинальным клоном голоса (0 = креативный, 1 = похожий)."
       },
       "style": {
-        "label": "Style Exaggeration",
-        "help": "Amplifies voice style. 0 = none; higher values add more expressiveness."
+        "label": "Преувеличение стиля",
+        "help": "Усиливает стиль голоса. 0 = нет; большие значения добавляют выразительности."
       },
       "useSpeakerBoost": {
         "label": "Speaker Boost",
-        "help": "Enhances voice clarity and target speaker similarity."
+        "help": "Улучшает ясность голоса и схожесть с целевым спикером."
       },
       "speed": {
-        "label": "Speed",
-        "help": "Speech speed — range 0.7 (slow) to 1.2 (fast)."
+        "label": "Скорость",
+        "help": "Скорость речи — диапазон от 0.7 (медленно) до 1.2 (быстро)."
       }
     },
     "applyTextNormalization": {
-      "label": "Text Normalization",
-      "help": "How numbers and abbreviations are expanded (auto, on, or off)."
+      "label": "Нормализация текста",
+      "help": "Как раскрываются числа и сокращения (auto, on или off)."
     },
     "seed": {
-      "label": "Seed (Advanced)",
-      "help": "Set a fixed seed for reproducible output. 0 = random."
+      "label": "Seed (расширенное)",
+      "help": "Задайте фиксированный seed для воспроизводимого вывода. 0 = случайно."
     },
     "optimizeStreamingLatency": {
-      "label": "Streaming Latency (Advanced)",
-      "help": "Latency optimization level: 0 = none, 4 = maximum."
+      "label": "Задержка стриминга (расширенное)",
+      "help": "Уровень оптимизации задержки: 0 = нет, 4 = максимум."
     },
     "languageCode": {
-      "label": "Language Code",
-      "help": "ISO 639-1 language hint, e.g. 'en' or 'vi'. Advanced."
+      "label": "Код языка",
+      "help": "ISO 639-1 подсказка языка, например «en» или «vi». Расширенное."
     }
   },
   "edge": {
-    "voice": "Voice",
-    "speechRate": "Speech Rate",
-    "hint": "Edge TTS is free and requires no API key. Install with: pip install edge-tts",
+    "voice": "Голос",
+    "speechRate": "Скорость речи",
+    "hint": "Edge TTS бесплатен и не требует API-ключа. Установка: pip install edge-tts",
     "rate": {
-      "label": "Speech Rate",
-      "help": "Rate adjustment in percent. -50% = much slower, +100% = much faster."
+      "label": "Скорость речи",
+      "help": "Корректировка скорости в процентах. -50% = намного медленнее, +100% = намного быстрее."
     },
     "pitch": {
-      "label": "Pitch",
-      "help": "Pitch shift in Hz relative to neutral. Range: -50 Hz to +50 Hz."
+      "label": "Высота",
+      "help": "Сдвиг высоты в Гц относительно нейтрали. Диапазон: от -50 Гц до +50 Гц."
     },
     "volume": {
-      "label": "Volume",
-      "help": "Volume adjustment in percent. -50% = quieter, +100% = louder."
+      "label": "Громкость",
+      "help": "Корректировка громкости в процентах. -50% = тише, +100% = громче."
     }
   },
   "minimax": {
     "apiKey": "API-ключ",
     "groupId": "Group ID *",
-    "groupIdPlaceholder": "Required for MiniMax",
+    "groupIdPlaceholder": "Требуется для MiniMax",
     "apiBase": "API Base",
     "model": "Модель",
     "voiceId": "Voice ID",
     "speed": {
-      "label": "Speed",
-      "help": "Speech speed multiplier — 0.5 = slowest, 2.0 = fastest."
+      "label": "Скорость",
+      "help": "Множитель скорости речи — 0.5 = самая медленная, 2.0 = самая быстрая."
     },
     "vol": {
-      "label": "Volume",
-      "help": "Volume multiplier — 0.01 = near-silent, 10.0 = loudest."
+      "label": "Громкость",
+      "help": "Множитель громкости — 0.01 = почти тишина, 10.0 = громко."
     },
     "pitch": {
-      "label": "Pitch",
-      "help": "Pitch shift in semitones. -12 = one octave down, +12 = one octave up."
+      "label": "Высота",
+      "help": "Сдвиг высоты в полутонах. -12 = на октаву ниже, +12 = на октаву выше."
     },
     "emotion": {
-      "label": "Emotion",
-      "help": "Emotional tone applied to the synthesized voice."
+      "label": "Эмоция",
+      "help": "Эмоциональный тон, применяемый к синтезированному голосу."
     },
     "textNormalization": {
-      "label": "Text Normalization",
-      "help": "Whether numbers and symbols are expanded before synthesis."
+      "label": "Нормализация текста",
+      "help": "Раскрывать ли числа и символы перед синтезом."
     },
     "audio": {
       "format": {
-        "label": "Audio Format",
-        "help": "Output encoding: mp3, pcm, flac, or wav."
+        "label": "Формат аудио",
+        "help": "Кодировка вывода: mp3, pcm, flac или wav."
       },
       "sampleRate": {
-        "label": "Sample Rate",
-        "help": "Audio sample rate in Hz. Leave as Default for most use cases."
+        "label": "Частота дискретизации",
+        "help": "Частота дискретизации аудио в Гц. Оставьте Default для большинства случаев."
       },
       "bitrate": {
-        "label": "Bitrate (MP3 only)",
-        "help": "MP3 bit rate in bps. Only applies when format is mp3."
+        "label": "Битрейт (только MP3)",
+        "help": "Битрейт MP3 в bps. Применяется только когда формат mp3."
       },
       "channel": {
         "label": "Каналы",
-        "help": "1 = mono (smaller file), 2 = stereo."
+        "help": "1 = моно (меньший файл), 2 = стерео."
       }
     }
   },
   "gemini": {
     "apiKey": "API-ключ",
     "apiBase": "API Base URL",
-    "voice": "Voice",
+    "voice": "Голос",
     "model": "Модель",
-    "multiSpeaker": "Multi-Speaker",
-    "multiSpeakerHint": "Up to 2 speakers supported",
-    "audioTags": "Audio Tags",
-    "audioTagsHint": "Insert expressive tags like [laughs] directly in your text",
-    "speakerName": "Speaker Name",
-    "speakerVoice": "Speaker Voice",
-    "addSpeaker": "Add Speaker",
+    "multiSpeaker": "Несколько спикеров",
+    "multiSpeakerHint": "Поддерживается до 2 спикеров",
+    "audioTags": "Аудио-теги",
+    "audioTagsHint": "Вставляйте выразительные теги вроде [laughs] прямо в текст",
+    "speakerName": "Имя спикера",
+    "speakerVoice": "Голос спикера",
+    "addSpeaker": "Добавить спикера",
     "removeSpeaker": "Удалить",
-    "maxSpeakersReached": "Maximum 2 speakers reached",
+    "maxSpeakersReached": "Достигнут максимум в 2 спикера",
     "filterAll": "Все",
-    "filterEmotion": "Emotion",
-    "filterPacing": "Pacing",
-    "filterEffect": "Effect",
-    "filterVoiceQuality": "Voice Quality",
-    "searchPlaceholder": "Search tags…",
-    "insertTag": "Insert",
+    "filterEmotion": "Эмоция",
+    "filterPacing": "Темп",
+    "filterEffect": "Эффект",
+    "filterVoiceQuality": "Качество голоса",
+    "searchPlaceholder": "Поиск тегов…",
+    "insertTag": "Вставить",
     "multiSpeakerMode": {
-      "title": "Multi-Speaker Mode",
-      "addSpeaker": "Add speaker",
-      "speakerName": "Speaker name",
-      "speakerVoice": "Voice",
+      "title": "Режим нескольких спикеров",
+      "addSpeaker": "Добавить спикера",
+      "speakerName": "Имя спикера",
+      "speakerVoice": "Голос",
       "removeSpeaker": "Удалить",
-      "limitReached": "Maximum 2 speakers"
+      "limitReached": "Максимум 2 спикера"
     },
     "audioTagsPanel": {
-      "title": "Audio Tags",
-      "search": "Search tags",
-      "categoryEmotion": "Emotion",
-      "categoryPacing": "Pacing",
-      "categoryEffect": "Effect",
-      "categoryVoiceQuality": "Voice quality",
-      "insertHint": "Click a tag to insert at caret"
+      "title": "Аудио-теги",
+      "search": "Поиск тегов",
+      "categoryEmotion": "Эмоция",
+      "categoryPacing": "Темп",
+      "categoryEffect": "Эффект",
+      "categoryVoiceQuality": "Качество голоса",
+      "insertHint": "Кликните по тегу, чтобы вставить в позиции курсора"
     },
-    "previewBadge": "Предпросмотр"
+    "previewBadge": "Превью"
   },
-  "voice_label": "Voice",
-  "voice_placeholder": "Select a voice…",
+  "voice_label": "Голос",
+  "voice_placeholder": "Выберите голос…",
   "voice_picker": {
-    "requires_provider": "Configure TTS provider first",
-    "enter_voice_id": "Enter voice_id manually"
+    "requires_provider": "Сначала настройте TTS-провайдера",
+    "enter_voice_id": "Ввести voice_id вручную"
   },
   "voice_refresh": "Обновить",
-  "voice_preview": "Предпросмотр",
-  "voice_stop_preview": "Остановить",
-  "voice_no_voices": "No voices available",
-  "voice_save_config_first": "Save API key first to load voices",
-  "voice_loading": "Loading voices…",
-  "voice_preview_error": "Preview failed — refreshing list",
+  "voice_preview": "Превью",
+  "voice_stop_preview": "Стоп",
+  "voice_no_voices": "Нет доступных голосов",
+  "voice_save_config_first": "Сначала сохраните API-ключ, чтобы загрузить голоса",
+  "voice_loading": "Загрузка голосов…",
+  "voice_preview_error": "Ошибка превью — список обновляется",
   "model_label": "Модель",
-  "model_placeholder": "Default (tenant/system)",
+  "model_placeholder": "По умолчанию (tenant/система)",
   "empty_state": {
-    "title": "TTS not configured",
-    "description": "Configure a TTS provider to enable voice for agents.",
-    "cta": "Configure TTS",
-    "non_owner_hint": "Contact the workspace owner to configure TTS."
+    "title": "TTS не настроен",
+    "description": "Настройте TTS-провайдера, чтобы включить голос для агентов.",
+    "cta": "Настроить TTS",
+    "non_owner_hint": "Свяжитесь с владельцем рабочей области, чтобы настроить TTS."
   },
   "override": {
-    "label": "Override voice for this agent",
-    "inherits": "Inherits: {{provider}} · {{voice}} · {{model}}",
+    "label": "Переопределить голос для этого агента",
+    "inherits": "Наследуется: {{provider}} · {{voice}} · {{model}}",
     "params": {
-      "title": "Fine-tune"
+      "title": "Точная настройка"
     }
   },
   "test": {
-    "button": "Test this voice",
-    "sample_text": "Hello, this is a voice test."
+    "button": "Протестировать этот голос",
+    "sample_text": "Привет, это тест голоса."
   },
   "testConnection": {
-    "label": "Test connection",
-    "testing": "Testing…",
-    "success": "Connection successful",
+    "label": "Проверить подключение",
+    "testing": "Проверка…",
+    "success": "Подключение успешно",
     "failed": "Ошибка подключения"
   },
   "playground": {
-    "title": "Test Playground",
-    "inputLabel": "Text to synthesize",
-    "placeholder": "Enter text to hear…",
-    "play": "Play",
-    "stop": "Остановить",
-    "synthesizing": "Synthesizing…",
-    "playbackFailed": "Playback failed",
-    "requiresProvider": "Select a provider above to enable test playback."
+    "title": "Тестовая площадка",
+    "inputLabel": "Текст для синтеза",
+    "placeholder": "Введите текст для прослушивания…",
+    "play": "Воспроизвести",
+    "stop": "Стоп",
+    "synthesizing": "Синтез…",
+    "playbackFailed": "Ошибка воспроизведения",
+    "requiresProvider": "Выберите провайдера выше, чтобы включить тестовое воспроизведение."
   },
   "advanced": {
-    "title": "Advanced settings",
-    "count": "{{count}} advanced settings",
-    "count_one": "{{count}} advanced setting"
+    "title": "Расширенные настройки",
+    "count": "{{count}} расширенных настроек",
+    "count_one": "{{count}} расширенная настройка"
   }
 }

@@ -1,76 +1,76 @@
 {
   "title": "API-ключи",
-  "description": "Manage gateway API keys with fine-grained permissions.",
+  "description": "Управление API-ключами шлюза с детальными правами.",
   "addKey": "Создать API-ключ",
-  "searchPlaceholder": "Search keys...",
-  "emptyTitle": "No API keys",
-  "emptyDescription": "Create your first API key to authenticate with the gateway.",
+  "searchPlaceholder": "Поиск ключей...",
+  "emptyTitle": "API-ключей нет",
+  "emptyDescription": "Создайте свой первый API-ключ для аутентификации со шлюзом.",
   "columns": {
     "name": "Имя",
     "prefix": "Ключ",
-    "scopes": "Области",
-    "lastUsed": "Last Used",
-    "created": "Создано",
+    "scopes": "Scopes",
+    "lastUsed": "Последнее использование",
+    "created": "Создан",
     "status": "Статус",
     "actions": "Действия"
   },
   "status": {
-    "active": "Активно",
-    "revoked": "Revoked",
+    "active": "Активен",
+    "revoked": "Отозван",
     "expired": "Истёк"
   },
   "form": {
     "title": "Создать API-ключ",
     "name": "Имя",
-    "namePlaceholder": "e.g. ci-deploy, dashboard-readonly",
-    "scopes": "Области",
+    "namePlaceholder": "например, ci-deploy, dashboard-readonly",
+    "scopes": "Scopes",
     "scopeDescriptions": {
-      "operator.admin": "Full admin access",
-      "operator.read": "Read-only access",
-      "operator.write": "Read + write access",
-      "operator.approvals": "Manage exec approvals",
-      "operator.pairing": "Manage device pairing",
-      "operator.provision": "Provision new tenants"
+      "operator.admin": "Полный админ-доступ",
+      "operator.read": "Доступ только на чтение",
+      "operator.write": "Доступ на чтение и запись",
+      "operator.approvals": "Управление одобрениями exec",
+      "operator.pairing": "Управление сопряжением устройств",
+      "operator.provision": "Provisioning новых тенантов"
     },
     "tenant": "Тенант",
-    "tenantSystem": "System (all tenants)",
-    "expiry": "Expiry",
+    "tenantSystem": "Система (все тенанты)",
+    "expiry": "Срок действия",
     "expiryOptions": {
       "never": "Никогда",
-      "7d": "7 days",
-      "30d": "30 days",
-      "90d": "90 days"
+      "7d": "7 дней",
+      "30d": "30 дней",
+      "90d": "90 дней"
     },
     "cancel": "Отмена",
     "create": "Создать",
     "creating": "Создание..."
   },
   "created": {
-    "title": "API Key Created",
-    "description": "Copy this key now — it won't be shown again.",
+    "title": "API-ключ создан",
+    "description": "Скопируйте этот ключ сейчас — он больше не будет показан.",
     "copied": "Скопировано!",
-    "copy": "Copy to clipboard",
-    "done": "Done"
+    "copy": "Копировать в буфер",
+    "done": "Готово"
   },
   "revoke": {
-    "title": "Revoke API Key",
-    "description": "Are you sure you want to revoke \"{{name}}\"? This cannot be undone.",
+    "title": "Отозвать API-ключ",
+    "description": "Вы уверены, что хотите отозвать «{{name}}»? Это нельзя отменить.",
     "confirmLabel": "Отозвать"
   },
   "toast": {
     "created": "API-ключ создан",
-    "revoked": "API key revoked",
-    "failedCreate": "Не удалось создать API key",
-    "failedRevoke": "Не удалось отозвать API key"
+    "revoked": "API-ключ отозван",
+    "failedCreate": "Не удалось создать API-ключ",
+    "failedRevoke": "Не удалось отозвать API-ключ"
   },
   "never": "Никогда",
-  "neverUsed": "Never used",
-  "tenantBadgeSystem": "System",
+  "neverUsed": "Не использовался",
+  "tenantBadgeSystem": "Система",
   "tenantBadgeUnknown": "Неизвестно",
-  "columns.expiry": "Expiry",
+  "columns.expiry": "Срок действия",
   "codeDialog": {
-    "title": "API Key Usage",
-    "description": "Use this API key to authenticate with the gateway HTTP API.",
+    "title": "Использование API-ключа",
+    "description": "Используйте этот API-ключ для аутентификации с HTTP API шлюза.",
     "copy": "Копировать",
     "copied": "Скопировано!",
     "tabs": {
@@ -79,9 +79,9 @@
       "go": "Go"
     },
     "comments": {
-      "chat": "Chat with an agent (OpenAI-compatible)",
-      "listAgents": "List agents",
-      "listSessions": "List sessions"
+      "chat": "Чат с агентом (совместимый с OpenAI)",
+      "listAgents": "Список агентов",
+      "listSessions": "Список сессий"
     }
   }
 }

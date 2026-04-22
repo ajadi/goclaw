@@ -1,33 +1,33 @@
 {
   "title": "Подтверждения",
-  "description": "Pending execution approvals",
-  "pending": "{{count}} pending",
-  "emptyTitle": "Нет ожидающих подтверждений",
-  "emptyDescription": "All execution requests have been resolved. New requests will appear here in real-time.",
-  "allowOnce": "Allow Once",
-  "allowAlways": "Allow Always",
+  "description": "Ожидающие одобрения выполнения",
+  "pending": "{{count}} ожидает",
+  "emptyTitle": "Ожидающих одобрений нет",
+  "emptyDescription": "Все запросы на выполнение разрешены. Новые запросы появятся здесь в реальном времени.",
+  "allowOnce": "Разрешить один раз",
+  "allowAlways": "Разрешить всегда",
   "deny": "Запретить",
   "confirmAllowOnce": {
-    "title": "Allow Once",
-    "description": "Allow execution of \"{{command}}\" from agent \"{{agentId}}\"?"
+    "title": "Разрешить один раз",
+    "description": "Разрешить выполнение «{{command}}» от агента «{{agentId}}»?"
   },
   "confirmAllowAlways": {
-    "title": "Allow Always",
-    "description": "Permanently allow \"{{command}}\" for agent \"{{agentId}}\"? This command will be auto-approved in the future."
+    "title": "Разрешить всегда",
+    "description": "Постоянно разрешить «{{command}}» для агента «{{agentId}}»? Эта команда будет авто-одобряться в будущем."
   },
   "confirmDeny": {
-    "title": "Deny Execution",
-    "description": "Deny execution request \"{{command}}\" from agent \"{{agentId}}\"?",
+    "title": "Запретить выполнение",
+    "description": "Запретить запрос на выполнение «{{command}}» от агента «{{agentId}}»?",
     "confirmLabel": "Запретить"
   },
   "toast": {
-    "approved": "Подтверждено",
-    "approvedAlways": "Command always allowed",
-    "approvedOnce": "Command approved",
-    "approveFailed": "Failed to approve",
-    "denied": "Denied",
-    "deniedDesc": "Command denied",
-    "denyFailed": "Failed to deny",
-    "unknownError": "Unknown error"
+    "approved": "Одобрено",
+    "approvedAlways": "Команда всегда разрешена",
+    "approvedOnce": "Команда одобрена",
+    "approveFailed": "Не удалось одобрить",
+    "denied": "Отклонено",
+    "deniedDesc": "Команда отклонена",
+    "denyFailed": "Не удалось отклонить",
+    "unknownError": "Неизвестная ошибка"
   }
 }

@@ -1,40 +1,36 @@
 {
   "title": "События в реальном времени",
-  "description": "Live WebSocket events across all teams and agents",
-  "live": "Live",
-  "paused": "Приостановлено",
+  "description": "Живые WebSocket-события по всем командам и агентам",
+  "live": "В эфире",
+  "paused": "Пауза",
   "resume": "Возобновить",
   "pause": "Пауза",
   "clear": "Очистить",
-  "scrollToBottom": "Scroll to bottom",
-  "eventCount": "{{count}} event",
-  "eventCountPlural": "{{count}} events",
+  "scrollToBottom": "Прокрутить вниз",
+  "eventCount": "{{count}} событие",
+  "eventCountPlural": "{{count}} событий",
   "categories": {
     "all": "Все",
-    "task": "Task",
+    "task": "Задача",
     "message": "Сообщение",
     "agent": "Агент",
-    "teamCrud": "Team CRUD",
-    "agentLink": "Agent Link"
+    "teamCrud": "CRUD команды",
+    "agentLink": "Связь агентов"
   },
   "filters": {
-    "allTeams": "All teams",
-    "allUsers": "All users",
-    "allChats": "All chats"
+    "allTeams": "Все команды",
+    "allUsers": "Все пользователи",
+    "allChats": "Все чаты"
   },
-  "global": "Global",
-  "emptyTitle": "No events yet",
-  "emptyPaused": "Event capture is paused. Resume to see new events.",
-  "emptyWaiting": "Waiting for real-time events... Events will appear as agents work.",
+  "global": "Глобально",
+  "emptyTitle": "Событий пока нет",
+  "emptyPaused": "Захват событий на паузе. Возобновите, чтобы видеть новые события.",
+  "emptyWaiting": "Ожидание событий в реальном времени... События появятся по мере работы агентов.",
   "detail": {
     "copy": "Копировать",
     "copied": "Скопировано"
   },
-  "toolBadge": {
-    "error": "ошибка",
-    "activated": "activated",
-    "ok": "ok"
-  },
-  "moreArgs": "...{{count}} more",
-  "parentLabel": "parent:"
+  "toolBadge": { "error": "ошибка", "activated": "активирован", "ok": "ok" },
+  "moreArgs": "...ещё {{count}}",
+  "parentLabel": "родитель:"
 }

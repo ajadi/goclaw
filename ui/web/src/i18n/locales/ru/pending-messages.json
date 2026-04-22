@@ -1,50 +1,50 @@
 {
   "title": "Ожидающие сообщения",
-  "description": "Buffered channel messages awaiting agent processing",
-  "emptyTitle": "Нет ожидающих сообщений",
-  "emptyDescription": "No buffered message groups found. Messages appear here when channels buffer incoming messages before agent processing.",
+  "description": "Буферизованные сообщения каналов, ожидающие обработки агентом",
+  "emptyTitle": "Ожидающих сообщений нет",
+  "emptyDescription": "Буферизованные группы сообщений не найдены. Сообщения появляются здесь, когда каналы буферизуют входящие сообщения перед обработкой агентом.",
   "howItWorks": {
-    "title": "How it works",
-    "step1": "Messages from channels (Telegram, Discord, etc.) are buffered here while the agent is busy or offline.",
-    "step2": "When the buffer reaches the threshold (default: 50 messages), auto-compaction kicks in — an LLM summarizes older messages, keeping only the 15 most recent.",
-    "step3": "On the agent's next turn, the compacted summary + recent messages are injected as context, so the agent catches up without being overwhelmed.",
-    "compactAction": "Compact — Manually trigger LLM summarization now. Useful when you want the agent to process a clean summary instead of raw message flood.",
-    "clearAction": "Clear — Permanently delete all buffered messages for a group. Use when messages are no longer relevant."
+    "title": "Как это работает",
+    "step1": "Сообщения из каналов (Telegram, Discord и т. д.) буферизуются здесь, пока агент занят или оффлайн.",
+    "step2": "Когда буфер достигает порога (по умолчанию 50 сообщений), включается авто-сжатие — LLM суммаризирует более старые сообщения, оставляя только 15 самых свежих.",
+    "step3": "На следующем ходу агента сжатая сводка + недавние сообщения внедряются как контекст, чтобы агент мог догнать без перегрузки.",
+    "compactAction": "Сжать — Запустить LLM-суммаризацию вручную сейчас. Полезно, когда хотите, чтобы агент обработал чистую сводку вместо потока сырых сообщений.",
+    "clearAction": "Очистить — Безвозвратно удалить все буферизованные сообщения для группы. Используйте, когда сообщения больше не актуальны."
   },
   "columns": {
     "channel": "Канал",
     "group": "Группа",
     "messages": "Сообщения",
     "status": "Статус",
-    "lastActivity": "Last Activity",
+    "lastActivity": "Последняя активность",
     "actions": "Действия"
   },
   "status": {
-    "compacted": "Compacted",
-    "raw": "Raw"
+    "compacted": "Сжато",
+    "raw": "Сырые"
   },
-  "compact": "Compact",
-  "compacting": "Compacting…",
+  "compact": "Сжать",
+  "compacting": "Сжатие…",
   "clear": "Очистить",
   "confirmClear": {
-    "title": "Clear messages?",
-    "description": "This will permanently delete all messages in {{channel}} / {{key}}. This action cannot be undone.",
+    "title": "Очистить сообщения?",
+    "description": "Это безвозвратно удалит все сообщения в {{channel}} / {{key}}. Это действие нельзя отменить.",
     "cancel": "Отмена",
     "confirm": "Очистить"
   },
   "dialog": {
-    "title": "Messages — {{name}}",
-    "noMessages": "No messages found.",
-    "summary": "Саммари"
+    "title": "Сообщения — {{name}}",
+    "noMessages": "Сообщений не найдено.",
+    "summary": "Сводка"
   },
   "toast": {
-    "compacted": "Compaction complete",
-    "compactedSummarized": "Summarized to {{count}} messages",
-    "compactedDeleted": "All messages deleted (no LLM provider available)",
-    "compacting": "Compacting…",
-    "compactingDesc": "LLM summarization running in background. List will refresh automatically.",
-    "failedCompact": "Compaction failed",
-    "cleared": "Messages cleared",
-    "failedClear": "Failed to clear messages"
+    "compacted": "Сжатие завершено",
+    "compactedSummarized": "Суммаризировано в {{count}} сообщений",
+    "compactedDeleted": "Все сообщения удалены (LLM-провайдер недоступен)",
+    "compacting": "Сжатие…",
+    "compactingDesc": "LLM-суммаризация выполняется в фоне. Список обновится автоматически.",
+    "failedCompact": "Сжатие не удалось",
+    "cleared": "Сообщения очищены",
+    "failedClear": "Не удалось очистить сообщения"
   }
 }
