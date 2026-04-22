@@ -100,6 +100,20 @@ if [ -d /app/.claude-host ] && ! command -v claude >/dev/null 2>&1; then
   echo "WARNING: Claude credentials mounted but claude CLI not installed. Rebuild with: --build"
 fi
 
+
+# --- sandbox docker socket access ---
+if [ -S /var/run/docker.sock ]; then
+    SOCK_GID=$(stat -c '%g' /var/run/docker.sock)
+    if ! getent group "$SOCK_GID" >/dev/null 2>&1; then
+        addgroup -g "$SOCK_GID" docker 2>/dev/null || groupadd -g "$SOCK_GID" docker 2>/dev/null || true
+    fi
+    GRP_NAME=$(getent group "$SOCK_GID" | cut -d: -f1)
+    if [ -n "$GRP_NAME" ]; then
+        addgroup goclaw "$GRP_NAME" 2>/dev/null || usermod -aG "$GRP_NAME" goclaw 2>/dev/null || true
+    fi
+fi
+# --- end ---
+
 # Run command with privilege drop (su-exec in Docker, direct otherwise).
 run_as_goclaw() {
   if command -v su-exec >/dev/null 2>&1 && [ "$(id -u)" = "0" ]; then
