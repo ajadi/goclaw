@@ -1,97 +1,97 @@
 {
   "title": "Использование",
-  "description": "Token usage and costs by agent",
-  "emptyTitle": "No usage data",
-  "emptyDescription": "Usage data will appear here after agents process requests.",
+  "description": "Использование токенов и стоимость по агентам",
+  "emptyTitle": "Данных об использовании нет",
+  "emptyDescription": "Данные об использовании появятся здесь после того, как агенты обработают запросы.",
   "summary": {
-    "sessions": "{{count}} sessions",
-    "inputTokens": "Input tokens",
-    "outputTokens": "Output tokens",
-    "total": "Всего"
+    "sessions": "{{count}} сессий",
+    "inputTokens": "Входные токены",
+    "outputTokens": "Выходные токены",
+    "total": "Итого"
   },
-  "recentRecords": "Recent Records",
+  "recentRecords": "Недавние записи",
   "columns": {
     "agent": "Агент",
     "model": "Модель",
     "provider": "Провайдер",
-    "input": "Ввод",
-    "output": "Вывод",
-    "total": "Всего",
+    "input": "Вход",
+    "output": "Выход",
+    "total": "Итого",
     "channel": "Канал",
     "cost": "Стоимость",
     "status": "Статус"
   },
   "analytics": {
-    "title": "Usage Analytics",
-    "period24h": "24h",
-    "period7d": "7 days",
-    "period30d": "30 days",
-    "periodCustom": "Пользовательские",
-    "allAgents": "All Agents",
-    "allProviders": "All Providers",
-    "allChannels": "All Channels",
-    "activeFilters": "Active filters",
-    "clearAll": "Clear all",
-    "exportCsv": "Export CSV",
+    "title": "Аналитика использования",
+    "period24h": "24ч",
+    "period7d": "7 дней",
+    "period30d": "30 дней",
+    "periodCustom": "Произвольно",
+    "allAgents": "Все агенты",
+    "allProviders": "Все провайдеры",
+    "allChannels": "Все каналы",
+    "activeFilters": "Активные фильтры",
+    "clearAll": "Очистить все",
+    "exportCsv": "Экспорт CSV",
     "requests": "Запросы",
     "tokens": "Токены",
     "cost": "Стоимость",
-    "errors": "Errors",
-    "uniqueUsers": "Unique Users",
-    "llmCalls": "LLM Calls",
-    "toolCalls": "Tool Calls",
+    "errors": "Ошибки",
+    "uniqueUsers": "Уникальные пользователи",
+    "llmCalls": "LLM-вызовы",
+    "toolCalls": "Вызовы инструментов",
     "trendUp": "+{{value}}%",
     "trendDown": "{{value}}%",
-    "vsPrevious": "vs previous period",
-    "configurePricing": "Configure model pricing for cost tracking",
-    "noData": "No data for selected period",
+    "vsPrevious": "к предыдущему периоду",
+    "configurePricing": "Настройте тарификацию моделей для учёта стоимости",
+    "noData": "Данных за выбранный период нет",
     "tokenChart": {
-      "title": "Token Usage Over Time",
+      "title": "Использование токенов со временем",
       "input": "Входные токены",
       "output": "Выходные токены",
-      "cache": "Cache Read Tokens",
-      "thinking": "Thinking Tokens",
-      "total": "Всего"
+      "cache": "Токены чтения кэша",
+      "thinking": "Токены размышления",
+      "total": "Итого"
     },
     "requestChart": {
-      "title": "Request Volume & Errors",
+      "title": "Объём запросов и ошибки",
       "requests": "Запросы",
-      "errors": "Errors",
-      "errorRate": "Error Rate"
+      "errors": "Ошибки",
+      "errorRate": "Частота ошибок"
     },
     "distribution": {
-      "provider": "Provider Distribution",
-      "model": "Model Distribution",
-      "channel": "Channel Distribution",
-      "other": "Other",
-      "calls": "calls"
+      "provider": "Распределение провайдеров",
+      "model": "Распределение моделей",
+      "channel": "Распределение каналов",
+      "other": "Другое",
+      "calls": "вызовов"
     },
     "durationChart": {
-      "title": "Duration & Performance",
-      "avgDuration": "Avg Duration",
-      "errorRate": "Error Rate %"
+      "title": "Длительность и производительность",
+      "avgDuration": "Средняя длительность",
+      "errorRate": "Частота ошибок %"
     },
     "knowledgeChart": {
-      "title": "Memory & Knowledge Graph Growth",
-      "memoryDocs": "Memory Docs",
-      "memoryChunks": "Memory Chunks",
-      "kgEntities": "KG Entities",
-      "kgRelations": "KG Relations"
+      "title": "Рост памяти и графа знаний",
+      "memoryDocs": "Документы памяти",
+      "memoryChunks": "Чанки памяти",
+      "kgEntities": "Сущности KG",
+      "kgRelations": "Связи KG"
     },
     "topModels": {
-      "title": "Top Models",
+      "title": "Топ моделей",
       "model": "Модель",
       "provider": "Провайдер",
-      "llmCalls": "LLM Calls",
+      "llmCalls": "LLM-вызовы",
       "inputTokens": "Входные токены",
       "outputTokens": "Выходные токены",
-      "avgDuration": "Avg Duration",
+      "avgDuration": "Средняя длительность",
       "cost": "Стоимость"
     },
     "tooltip": {
       "date": "Дата",
-      "total": "Всего",
-      "errorRate": "{{value}}% error rate"
+      "total": "Итого",
+      "errorRate": "{{value}}% частота ошибок"
     }
   }
 }

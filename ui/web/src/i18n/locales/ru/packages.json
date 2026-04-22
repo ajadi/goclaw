@@ -1,66 +1,66 @@
 {
-  "title": "Runtime & Packages",
-  "description": "Manage runtimes and installed packages inside the active GoClaw runtime container",
+  "title": "Runtime и пакеты",
+  "description": "Управление рантаймами и установленными пакетами внутри активного runtime-контейнера GoClaw",
   "runtimes": {
-    "title": "Среды выполнения",
-    "scopeTitle": "Container-scoped runtime status",
-    "scopeDesc": "These checks run inside the active GoClaw runtime container. Host-installed runtimes, shell profile changes, and nvm-managed binaries are not used here.",
-    "minimalImageHint": "The published latest image is minimal, so missing Python or Node runtimes can be expected there. Use the python, node, or full image variant, rebuild with ENABLE_PYTHON=true / ENABLE_NODE=true / ENABLE_FULL_SKILLS=true, or install runtimes manually in this container.",
-    "available": "Available",
-    "missing": "Missing",
-    "missingInContainer": "Missing in container"
+    "title": "Рантаймы",
+    "scopeTitle": "Статус рантаймов в пределах контейнера",
+    "scopeDesc": "Эти проверки выполняются внутри активного runtime-контейнера GoClaw. Установленные на хосте рантаймы, изменения shell-профиля и управляемые через nvm бинарники здесь не используются.",
+    "minimalImageHint": "Опубликованный образ latest минимальный, поэтому отсутствующие рантаймы Python или Node там ожидаемы. Используйте вариант образа python, node или full, пересоберите с ENABLE_PYTHON=true / ENABLE_NODE=true / ENABLE_FULL_SKILLS=true или установите рантаймы вручную в этом контейнере.",
+    "available": "Доступен",
+    "missing": "Отсутствует",
+    "missingInContainer": "Отсутствует в контейнере"
   },
   "system": {
-    "title": "System Packages",
-    "placeholder": "Package name (e.g. github-cli)"
+    "title": "Системные пакеты",
+    "placeholder": "Имя пакета (например, github-cli)"
   },
   "pip": {
-    "title": "Python Packages",
-    "placeholder": "Package name (e.g. pandas)"
+    "title": "Python-пакеты",
+    "placeholder": "Имя пакета (например, pandas)"
   },
   "npm": {
-    "title": "Node Packages",
-    "placeholder": "Package name (e.g. typescript)"
+    "title": "Node-пакеты",
+    "placeholder": "Имя пакета (например, typescript)"
   },
   "github": {
-    "title": "GitHub Binaries",
-    "placeholder": "owner/repo[@tag] (e.g. cli/cli@v2.45.0)",
-    "browse": "Browse releases",
-    "muslWarning": "Alpine Linux uses musl libc. Binaries compiled against glibc may fail at runtime. Prefer static or musl-compatible releases.",
-    "muslDismiss": "Закрыть",
-    "pickerTitle": "Select release from {{repo}}",
-    "pickerEmpty": "No releases found for {{repo}}",
-    "pickerLoading": "Loading releases...",
-    "pickerMatchingAssets": "{{count}} matching / {{total}} total",
-    "pickerPrerelease": "Pre-release",
+    "title": "GitHub-бинарники",
+    "placeholder": "owner/repo[@tag] (например, cli/cli@v2.45.0)",
+    "browse": "Посмотреть релизы",
+    "muslWarning": "Alpine Linux использует musl libc. Бинарники, скомпилированные с glibc, могут не работать. Предпочитайте статические или совместимые с musl релизы.",
+    "muslDismiss": "Скрыть",
+    "pickerTitle": "Выберите релиз из {{repo}}",
+    "pickerEmpty": "Релизы для {{repo}} не найдены",
+    "pickerLoading": "Загрузка релизов...",
+    "pickerMatchingAssets": "{{count}} подходящих / {{total}} всего",
+    "pickerPrerelease": "Пре-релиз",
     "pickerSelect": "Выбрать",
     "columns": {
-      "repo": "Repository",
+      "repo": "Репозиторий",
       "tag": "Версия",
-      "binaries": "Binaries",
-      "installedAt": "Installed"
+      "binaries": "Бинарники",
+      "installedAt": "Установлено"
     }
   },
   "actions": {
     "install": "Установить",
     "uninstall": "Удалить",
-    "installing": "Installing...",
-    "uninstalling": "Removing..."
+    "installing": "Установка...",
+    "uninstalling": "Удаление..."
   },
   "messages": {
-    "installSuccess": "{{name}} installed successfully",
-    "installError": "Failed to install {{name}}",
-    "uninstallSuccess": "{{name}} removed successfully",
-    "uninstallError": "Failed to remove {{name}}"
+    "installSuccess": "{{name}} успешно установлен",
+    "installError": "Не удалось установить {{name}}",
+    "uninstallSuccess": "{{name}} успешно удалён",
+    "uninstallError": "Не удалось удалить {{name}}"
   },
   "confirmUninstall": {
-    "title": "Confirm Uninstall",
-    "description": "Are you sure you want to remove {{name}}? This action cannot be undone."
+    "title": "Подтвердите удаление",
+    "description": "Вы уверены, что хотите удалить {{name}}? Это действие нельзя отменить."
   },
   "table": {
     "name": "Имя",
     "version": "Версия",
     "actions": "Действия",
-    "empty": "No packages installed"
+    "empty": "Пакетов не установлено"
   }
 }
